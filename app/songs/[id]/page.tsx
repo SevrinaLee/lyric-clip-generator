@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Lyric, Song } from "@/lib/types";
+import type { ClipSegment, Export, Lyric, Song, VideoTemplate } from "@/lib/types";
 import { LyricEntryForm } from "./LyricEntryForm";
+import { GenerateClipsButton } from "./GenerateClipsButton";
+import { SegmentsPanel } from "./SegmentsPanel";
+
+// Rendering a clip (ffmpeg trim + drawtext + mux) runs inline inside the
+// queueExport server action and can take longer than the 10s default.
+export const maxDuration = 60;
 
 export default async function SongDetailPage({
   params,
@@ -20,14 +26,43 @@ export default async function SongDetailPage({
 
   if (!song) notFound();
 
-  const { data: lyrics } = await supabase
-    .from("lyrics")
-    .select("*")
-    .eq("song_id", id)
-    .order("line_index", { ascending: true })
-    .returns<Lyric[]>();
+  const [
+    { data: lyrics },
+    { data: segments },
+    { data: templates },
+    { data: exportRows },
+  ] = await Promise.all([
+    supabase
+      .from("lyrics")
+      .select("*")
+      .eq("song_id", id)
+      .order("line_index", { ascending: true })
+      .returns<Lyric[]>(),
+    supabase
+      .from("clip_segments")
+      .select("*")
+      .eq("song_id", id)
+      .order("start_ms", { ascending: true })
+      .returns<ClipSegment[]>(),
+    supabase.from("video_templates").select("*").returns<VideoTemplate[]>(),
+    supabase
+      .from("exports")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .returns<Export[]>(),
+  ]);
 
   const hasLyrics = (lyrics?.length ?? 0) > 0;
+  const hasSegments = (segments?.length ?? 0) > 0;
+
+  // Latest export per clip_segment_id (exports is queried unfiltered since
+  // there's no FK to song_id — fine at this dataset size for v1).
+  const exportsBySegment = new Map<string, Export>();
+  for (const exp of exportRows ?? []) {
+    if (!exportsBySegment.has(exp.clip_segment_id)) {
+      exportsBySegment.set(exp.clip_segment_id, exp);
+    }
+  }
 
   return (
     <main className="min-h-screen p-8 max-w-2xl mx-auto space-y-6">
@@ -71,6 +106,24 @@ export default async function SongDetailPage({
           </ol>
         )}
       </section>
+
+      {hasLyrics && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+            Clips
+          </h2>
+
+          {!hasSegments ? (
+            <GenerateClipsButton songId={song.id} />
+          ) : (
+            <SegmentsPanel
+              segments={segments!}
+              templates={templates ?? []}
+              exportsBySegment={exportsBySegment}
+            />
+          )}
+        </section>
+      )}
     </main>
   );
 }
