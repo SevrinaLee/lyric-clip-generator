@@ -12,4 +12,4 @@ npm-debug.log*
 next-env.d.ts
 .env*
 supabase/.temp/
-.claude/settings.local.json
+.claude/
