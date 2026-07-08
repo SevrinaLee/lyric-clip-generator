@@ -42,64 +42,65 @@ export const stripeAccountOptions = (): Stripe.RequestOptions | undefined =>
   CONNECT_ACCOUNT_ID ? { stripeAccount: CONNECT_ACCOUNT_ID } : undefined;
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────
+//
+// Uses inline `price_data` instead of pre-created Stripe Price objects — the
+// app is pre-auth (v1, no user accounts yet) and there's no dashboard step
+// to create Products/Prices ahead of time, so amounts are defined here.
 
-export async function createCheckoutSession({
-  priceId,
-  customerId,
-  userId,
+const SINGLE_SONG_CENTS = 499;
+const SUBSCRIPTION_MONTHLY_CENTS = 1499;
+
+export async function createSongCheckoutSession({
+  songTitle,
+  paymentId,
+  songId,
+  plan,
   successUrl,
   cancelUrl,
-  mode = "subscription",
 }: {
-  priceId: string;
-  customerId?: string;
-  userId: string;
+  songTitle: string;
+  paymentId: string;
+  songId: string;
+  plan: "single" | "subscription";
   successUrl: string;
   cancelUrl: string;
-  mode?: "payment" | "subscription";
 }) {
+  const mode = plan === "subscription" ? "subscription" : "payment";
+  const unitAmount =
+    plan === "subscription" ? SUBSCRIPTION_MONTHLY_CENTS : SINGLE_SONG_CENTS;
+
   const params: Stripe.Checkout.SessionCreateParams = {
     mode,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: `${songTitle} — export unlock` },
+          unit_amount: unitAmount,
+          ...(mode === "subscription"
+            ? { recurring: { interval: "month" as const } }
+            : {}),
+        },
+        quantity: 1,
+      },
+    ],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    metadata: { userId },
-    ...(customerId
-      ? { customer: customerId }
-      : { customer_creation: "always" }),
-
-    // Subscription platform fee
-    ...(mode === "subscription" && PLATFORM_FEE_PERCENT > 0
+    customer_creation: mode === "payment" ? "always" : undefined,
+    metadata: { paymentId, songId },
+    ...(mode === "subscription"
       ? {
           subscription_data: {
-            metadata: { userId },
-            application_fee_percent: PLATFORM_FEE_PERCENT,
+            metadata: { paymentId, songId },
+            ...(PLATFORM_FEE_PERCENT > 0
+              ? { application_fee_percent: PLATFORM_FEE_PERCENT }
+              : {}),
           },
         }
-      : mode === "subscription"
-      ? { subscription_data: { metadata: { userId } } }
       : {}),
-
-    // One-time payment platform fee — calculated after price lookup
-    // (handled in checkout route where we have the amount)
   };
 
   return stripe.checkout.sessions.create(params, stripeAccountOptions());
-}
-
-// ─── Billing portal ───────────────────────────────────────────────────────────
-
-export async function createPortalSession({
-  customerId,
-  returnUrl,
-}: {
-  customerId: string;
-  returnUrl: string;
-}) {
-  return stripe.billingPortal.sessions.create(
-    { customer: customerId, return_url: returnUrl },
-    stripeAccountOptions(),
-  );
 }
 
 // ─── Webhook ──────────────────────────────────────────────────────────────────

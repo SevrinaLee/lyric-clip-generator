@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { ClipSegment, Export, Lyric, Song, VideoTemplate } from "@/lib/types";
 import { LyricEntryForm } from "./LyricEntryForm";
 import { GenerateClipsButton } from "./GenerateClipsButton";
 import { SegmentsPanel } from "./SegmentsPanel";
+import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 
 // Rendering a clip (ffmpeg trim + drawtext + mux) runs inline inside the
 // queueExport server action and can take longer than the 10s default.
@@ -31,6 +33,7 @@ export default async function SongDetailPage({
     { data: segments },
     { data: templates },
     { data: exportRows },
+    { data: paidPayments },
   ] = await Promise.all([
     supabase
       .from("lyrics")
@@ -50,10 +53,17 @@ export default async function SongDetailPage({
       .select("*")
       .order("created_at", { ascending: false })
       .returns<Export[]>(),
+    supabase
+      .from("payments")
+      .select("id")
+      .eq("song_id", id)
+      .eq("status", "paid")
+      .limit(1),
   ]);
 
   const hasLyrics = (lyrics?.length ?? 0) > 0;
   const hasSegments = (segments?.length ?? 0) > 0;
+  const hasPaid = (paidPayments?.length ?? 0) > 0;
 
   // Latest export per clip_segment_id (exports is queried unfiltered since
   // there's no FK to song_id — fine at this dataset size for v1).
@@ -74,6 +84,10 @@ export default async function SongDetailPage({
         <h1 className="text-2xl font-bold tracking-tight">{song.title}</h1>
         <p className="text-neutral-500">{song.artist}</p>
       </div>
+
+      <Suspense fallback={null}>
+        <CheckoutStatusWatcher songId={song.id} />
+      </Suspense>
 
       {song.audio_url && (
         <audio controls src={song.audio_url} className="w-full">
@@ -117,9 +131,11 @@ export default async function SongDetailPage({
             <GenerateClipsButton songId={song.id} />
           ) : (
             <SegmentsPanel
+              songId={song.id}
               segments={segments!}
               templates={templates ?? []}
               exportsBySegment={exportsBySegment}
+              hasPaid={hasPaid}
             />
           )}
         </section>

@@ -3,24 +3,31 @@
 import { useState, useTransition } from "react";
 import type { ClipSegment, Export, VideoTemplate } from "@/lib/types";
 import { queueExport, selectTemplate } from "./actions";
+import { PaymentGate } from "./PaymentGate";
 
 export function SegmentsPanel({
+  songId,
   segments,
   templates,
   exportsBySegment,
+  hasPaid,
 }: {
+  songId: string;
   segments: ClipSegment[];
   templates: VideoTemplate[];
   exportsBySegment: Map<string, Export>;
+  hasPaid: boolean;
 }) {
   return (
     <ul className="space-y-4">
       {segments.map((segment) => (
         <SegmentRow
           key={segment.id}
+          songId={songId}
           segment={segment}
           templates={templates}
           latestExport={exportsBySegment.get(segment.id)}
+          hasPaid={hasPaid}
         />
       ))}
     </ul>
@@ -28,13 +35,17 @@ export function SegmentsPanel({
 }
 
 function SegmentRow({
+  songId,
   segment,
   templates,
   latestExport,
+  hasPaid,
 }: {
+  songId: string;
   segment: ClipSegment;
   templates: VideoTemplate[];
   latestExport?: Export;
+  hasPaid: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -115,7 +126,7 @@ function SegmentRow({
               : "Export"}
         </button>
 
-        {status === "done" && exportId && (
+        {status === "done" && exportId && hasPaid && (
           <a
             href={`/api/exports/${exportId}/download`}
             className="text-sm text-blue-600 hover:underline"
@@ -129,6 +140,8 @@ function SegmentRow({
           </span>
         )}
       </div>
+
+      {status === "done" && !hasPaid && <PaymentGate songId={songId} />}
     </li>
   );
 }

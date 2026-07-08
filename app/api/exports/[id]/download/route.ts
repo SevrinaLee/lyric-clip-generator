@@ -10,15 +10,43 @@ export async function GET(
 
   const { data: exportRow } = await supabase
     .from("exports")
-    .select("status, video_url")
+    .select("status, video_url, clip_segment_id")
     .eq("id", id)
-    .maybeSingle<{ status: string; video_url: string | null }>();
+    .maybeSingle<{
+      status: string;
+      video_url: string | null;
+      clip_segment_id: string;
+    }>();
 
   if (!exportRow || exportRow.status !== "done" || !exportRow.video_url) {
     return NextResponse.json(
       { error: "Export not ready" },
       { status: 404 },
     );
+  }
+
+  // Defense in depth — the UI already hides the Download link until a
+  // payment is confirmed, but the route itself must enforce the gate too.
+  const { data: segment } = await supabase
+    .from("clip_segments")
+    .select("song_id")
+    .eq("id", exportRow.clip_segment_id)
+    .maybeSingle<{ song_id: string }>();
+
+  if (segment) {
+    const { data: paidPayments } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("song_id", segment.song_id)
+      .eq("status", "paid")
+      .limit(1);
+
+    if (!paidPayments || paidPayments.length === 0) {
+      return NextResponse.json(
+        { error: "Payment required before downloading" },
+        { status: 402 },
+      );
+    }
   }
 
   const { data, error } = await supabase.storage

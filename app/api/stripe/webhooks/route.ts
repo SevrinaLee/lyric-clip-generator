@@ -6,15 +6,12 @@ import type Stripe from "stripe";
 /**
  * POST /api/stripe/webhooks
  *
- * Receives and processes Stripe webhook events.
- * Register this URL in your Stripe dashboard:
- *   https://dashboard.stripe.com/webhooks → add endpoint → /api/stripe/webhooks
+ * Register this URL in the Stripe dashboard → Webhooks → add endpoint →
+ * /api/stripe/webhooks, subscribed to `checkout.session.completed`.
  *
- * Required events to enable in Stripe dashboard:
- *   - checkout.session.completed
- *   - customer.subscription.updated
- *   - customer.subscription.deleted
- *   - invoice.payment_failed
+ * docs/SECURITY.md: validate the stripe-signature header before any DB
+ * write, and never return a non-2xx for handler errors (Stripe retries
+ * those) — only for genuine signature failures.
  */
 export async function POST(request: Request) {
   const payload = await request.text();
@@ -35,79 +32,25 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   try {
-    switch (event.type) {
-      // ── New subscription or one-time purchase ─────────────────────────────
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.metadata?.userId;
-        if (!userId) break;
-
-        // Store Stripe customer ID on profile for future portal/checkout calls
-        if (session.customer) {
-          await supabase
-            .from("profiles")
-            .update({ stripe_customer_id: session.customer as string })
-            .eq("id", userId);
-        }
-
-        // If subscription, the subscription.updated event will handle status
-        if (session.mode === "payment") {
-          await supabase.from("purchases").upsert({
-            user_id: userId,
-            stripe_customer_id: session.customer,
-            stripe_session_id: session.id,
-            amount_total: session.amount_total,
-            status: "paid",
-          });
-        }
-        break;
-      }
-
-      // ── Subscription created or updated ───────────────────────────────────
-      case "customer.subscription.updated":
-      case "customer.subscription.created": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = sub.metadata?.userId;
-        if (!userId) break;
-
-        await supabase.from("subscriptions").upsert({
-          id: sub.id,
-          user_id: userId,
-          stripe_customer_id: sub.customer as string,
-          status: sub.status,
-          price_id: sub.items.data[0]?.price.id,
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: sub.cancel_at_period_end,
-          updated_at: new Date().toISOString(),
-        });
-        break;
-      }
-
-      // ── Subscription cancelled ────────────────────────────────────────────
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const paymentId = session.metadata?.paymentId;
+      if (paymentId) {
         await supabase
-          .from("subscriptions")
-          .update({ status: "canceled", updated_at: new Date().toISOString() })
-          .eq("id", sub.id);
-        break;
+          .from("payments")
+          .update({
+            status: "paid",
+            stripe_payment_intent:
+              typeof session.payment_intent === "string"
+                ? session.payment_intent
+                : (session.payment_intent?.id ?? null),
+          })
+          .eq("id", paymentId);
       }
-
-      // ── Payment failed — notify user ──────────────────────────────────────
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        console.warn("[stripe/webhooks] payment failed for customer:", invoice.customer);
-        // TODO: send email via Supabase Edge Function or Resend
-        break;
-      }
-
-      default:
-        // Unhandled event — safe to ignore
-        break;
     }
   } catch (err) {
     console.error(`[stripe/webhooks] error handling ${event.type}:`, err);
-    // Return 200 anyway — Stripe will retry on 5xx, not on handler errors
+    // Still 200 — Stripe retries on non-2xx, not useful for our own bugs.
   }
 
   return NextResponse.json({ received: true });
