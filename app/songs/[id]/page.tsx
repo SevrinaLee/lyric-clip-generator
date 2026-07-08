@@ -7,6 +7,8 @@ import { LyricEntryForm } from "./LyricEntryForm";
 import { GenerateClipsButton } from "./GenerateClipsButton";
 import { SegmentsPanel } from "./SegmentsPanel";
 import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
+import { AutoTranscribeButton } from "./AutoTranscribeButton";
+import { EditableLyricsTable } from "./EditableLyricsTable";
 
 // Rendering a clip (ffmpeg trim + drawtext + mux) runs inline inside the
 // queueExport server action and can take longer than the 10s default.
@@ -64,6 +66,7 @@ export default async function SongDetailPage({
   const hasLyrics = (lyrics?.length ?? 0) > 0;
   const hasSegments = (segments?.length ?? 0) > 0;
   const hasPaid = (paidPayments?.length ?? 0) > 0;
+  const hasTimestamps = (lyrics ?? []).some((l) => l.start_ms != null);
 
   // Latest export per clip_segment_id (exports is queried unfiltered since
   // there's no FK to song_id — fine at this dataset size for v1).
@@ -106,7 +109,15 @@ export default async function SongDetailPage({
               Add lyrics to continue.
             </p>
             <LyricEntryForm songId={song.id} />
+            <div className="flex items-center gap-3 text-xs text-neutral-400">
+              <span className="h-px flex-1 bg-neutral-200" />
+              or
+              <span className="h-px flex-1 bg-neutral-200" />
+            </div>
+            <AutoTranscribeButton songId={song.id} />
           </div>
+        ) : hasTimestamps ? (
+          <EditableLyricsTable lyrics={lyrics!} />
         ) : (
           <ol className="space-y-1 text-sm">
             {lyrics!.map((line) => (
