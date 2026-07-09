@@ -30,7 +30,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
   if (confirmationSent) {
     return (
-      <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700">
+      <p className="rounded-xl bg-sage/20 px-4 py-3 text-sm text-ink">
         Check your email to confirm your account, then log in.
       </p>
     );
@@ -38,16 +38,16 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-4 text-sm border-b border-neutral-200">
+      <div className="flex gap-1 rounded-full bg-ink/5 p-1 text-sm">
         <button
           onClick={() => setMode("login")}
-          className={`pb-2 -mb-px border-b-2 ${mode === "login" ? "border-black font-medium" : "border-transparent text-neutral-400"}`}
+          className={`flex-1 rounded-full py-1.5 font-semibold transition-colors ${mode === "login" ? "bg-cream text-ink shadow-sm" : "text-ink/40"}`}
         >
           Log in
         </button>
         <button
           onClick={() => setMode("signup")}
-          className={`pb-2 -mb-px border-b-2 ${mode === "signup" ? "border-black font-medium" : "border-transparent text-neutral-400"}`}
+          className={`flex-1 rounded-full py-1.5 font-semibold transition-colors ${mode === "signup" ? "bg-cream text-ink shadow-sm" : "text-ink/40"}`}
         >
           Sign up
         </button>
@@ -55,7 +55,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
       <form action={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-1">
+          <label htmlFor="email" className="block text-sm font-medium mb-1 text-ink/70">
             Email
           </label>
           <input
@@ -63,11 +63,11 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             name="email"
             type="email"
             required
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-ink/15 bg-cream px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium mb-1">
+          <label htmlFor="password" className="block text-sm font-medium mb-1 text-ink/70">
             Password
           </label>
           <input
@@ -76,16 +76,16 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             type="password"
             required
             minLength={6}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-xl border border-ink/15 bg-cream px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-mauve">{error}</p>}
 
         <button
           type="submit"
           disabled={isPending}
-          className="w-full rounded-md bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+          className="w-full rounded-full bg-ink text-cream px-4 py-2.5 text-sm font-semibold hover:bg-ink/85 transition-colors disabled:opacity-50"
         >
           {isPending
             ? "Please wait…"

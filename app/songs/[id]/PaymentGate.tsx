@@ -29,24 +29,24 @@ export function PaymentGate({ songId }: { songId: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap rounded-2xl bg-gold/10 border border-gold/25 p-3">
       <button
         onClick={() => startCheckout("single")}
         disabled={loadingPlan !== null}
-        className="rounded-md bg-black text-white px-3 py-1.5 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-full bg-gold text-ink px-4 py-2 text-sm font-semibold hover:bg-gold/85 transition-colors disabled:opacity-50"
       >
         {loadingPlan === "single" ? "Redirecting…" : "Pay $4.99 to download"}
       </button>
       <button
         onClick={() => startCheckout("subscription")}
         disabled={loadingPlan !== null}
-        className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
+        className="rounded-full border border-ink/20 text-ink px-4 py-2 text-sm font-semibold hover:bg-ink/5 transition-colors disabled:opacity-50"
       >
         {loadingPlan === "subscription"
           ? "Redirecting…"
           : "Subscribe $14.99/mo"}
       </button>
-      {error && <p className="text-sm text-red-600 w-full">{error}</p>}
+      {error && <p className="text-sm text-mauve w-full">{error}</p>}
     </div>
   );
 }

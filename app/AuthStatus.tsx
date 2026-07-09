@@ -9,16 +9,22 @@ export async function AuthStatus() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="flex justify-end p-3 text-sm border-b border-neutral-100">
+    <div className="flex justify-end p-3 text-sm">
       {user ? (
         <form action={signOut} className="flex items-center gap-3">
-          <span className="text-neutral-500">{user.email}</span>
-          <button className="text-neutral-500 hover:underline" type="submit">
+          <span className="text-ink/50">{user.email}</span>
+          <button
+            className="rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5 transition-colors"
+            type="submit"
+          >
             Sign out
           </button>
         </form>
       ) : (
-        <Link href="/login" className="text-neutral-500 hover:underline">
+        <Link
+          href="/login"
+          className="rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5 transition-colors"
+        >
           Log in
         </Link>
       )}

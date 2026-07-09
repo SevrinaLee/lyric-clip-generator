@@ -25,11 +25,11 @@ export function AutoTranscribeButton({ songId }: { songId: string }) {
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
+        className="rounded-full border border-ink/20 text-ink px-5 py-2.5 text-sm font-semibold hover:bg-ink/5 transition-colors disabled:opacity-50"
       >
         {isPending ? "Transcribing…" : "Auto-transcribe from audio"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-mauve">{error}</p>}
     </div>
   );
 }

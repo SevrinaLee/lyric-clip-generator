@@ -27,11 +27,11 @@ export function GenerateClipsButton({ songId }: { songId: string }) {
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-full bg-gold text-ink px-5 py-2.5 text-sm font-semibold hover:bg-gold/85 transition-colors disabled:opacity-50"
       >
-        {isPending ? "Scoring clips…" : "Generate Clips"}
+        {isPending ? "Scoring clips…" : "✦ Generate Clips"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-mauve">{error}</p>}
     </div>
   );
 }

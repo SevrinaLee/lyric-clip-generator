@@ -48,33 +48,33 @@ export function NewSongForm() {
   return (
     <form ref={formRef} action={handleSubmit} className="space-y-5">
       <div>
-        <label htmlFor="title" className="block text-sm font-medium mb-1">
+        <label htmlFor="title" className="block text-sm font-medium mb-1 text-ink/70">
           Song title
         </label>
         <input
           id="title"
           name="title"
           required
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-ink/15 bg-cream px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
           placeholder="Neon City"
         />
       </div>
 
       <div>
-        <label htmlFor="artist" className="block text-sm font-medium mb-1">
+        <label htmlFor="artist" className="block text-sm font-medium mb-1 text-ink/70">
           Artist
         </label>
         <input
           id="artist"
           name="artist"
           required
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-ink/15 bg-cream px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
           placeholder="Demo Artist"
         />
       </div>
 
       <div>
-        <label htmlFor="audio" className="block text-sm font-medium mb-1">
+        <label htmlFor="audio" className="block text-sm font-medium mb-1 text-ink/70">
           Audio file (MP3 or WAV, max 50 MB)
         </label>
         <input
@@ -84,10 +84,10 @@ export function NewSongForm() {
           accept=".mp3,.wav,audio/mpeg,audio/wav"
           required
           onChange={handleFileChange}
-          className="w-full text-sm"
+          className="w-full text-sm text-ink/70 file:mr-3 file:rounded-full file:border-0 file:bg-ink file:text-cream file:px-4 file:py-2 file:text-sm file:font-semibold hover:file:bg-ink/85 file:cursor-pointer"
         />
         {duration && (
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="text-xs text-gold font-medium mt-1.5">
             Duration: {Math.round(duration)}s
           </p>
         )}
@@ -95,12 +95,12 @@ export function NewSongForm() {
 
       <input type="hidden" name="duration_seconds" value={duration ?? ""} />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-mauve">{error}</p>}
 
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-full bg-ink text-cream px-5 py-2.5 text-sm font-semibold hover:bg-ink/85 transition-colors disabled:opacity-50"
       >
         {isPending ? "Uploading…" : "Upload song"}
       </button>

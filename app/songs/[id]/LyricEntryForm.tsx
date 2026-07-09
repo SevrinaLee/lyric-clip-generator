@@ -23,7 +23,7 @@ export function LyricEntryForm({ songId }: { songId: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <label htmlFor="lyrics" className="block text-sm font-medium">
+      <label htmlFor="lyrics" className="block text-sm font-medium text-ink/70">
         Paste lyrics
       </label>
       <textarea
@@ -32,14 +32,14 @@ export function LyricEntryForm({ songId }: { songId: string }) {
         onChange={(e) => setText(e.target.value)}
         required
         rows={10}
-        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm font-mono"
+        className="w-full rounded-xl border border-ink/15 bg-cream px-3 py-2.5 text-sm font-mono text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
         placeholder={"Lights flash in the neon city\nEvery corner holds a different dream\n..."}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-mauve">{error}</p>}
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800 disabled:opacity-50"
+        className="rounded-full bg-ink text-cream px-5 py-2.5 text-sm font-semibold hover:bg-ink/85 transition-colors disabled:opacity-50"
       >
         {isPending ? "Saving…" : "Save lyrics"}
       </button>

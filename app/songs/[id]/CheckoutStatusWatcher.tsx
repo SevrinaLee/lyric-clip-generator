@@ -47,7 +47,7 @@ export function CheckoutStatusWatcher({ songId }: { songId: string }) {
 
   if (!message) return null;
   return (
-    <p className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-700">
+    <p className="rounded-xl bg-sage/20 px-4 py-3 text-sm text-ink">
       {message}
     </p>
   );

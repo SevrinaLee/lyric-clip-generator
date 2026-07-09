@@ -2,6 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { ClipSegment, Song, VideoTemplate } from "@/lib/types";
 
+const PLATFORM_STYLES: Record<string, string> = {
+  tiktok: "bg-mauve/15 text-mauve",
+  reels: "bg-sky/25 text-ink",
+  shorts: "bg-sage/30 text-ink",
+};
+
 export default async function Home() {
   const supabase = await createClient();
 
@@ -25,94 +31,113 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-5xl mx-auto space-y-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Lyric Clip Generator
-          </h1>
-          <p className="text-neutral-500 mt-1">
-            Turn a song into 3 platform-ready lyric clips in minutes.
-          </p>
-        </div>
-        <Link
-          href="/songs/new"
-          className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium hover:bg-neutral-800"
-        >
-          New Song
-        </Link>
-      </header>
+    <main className="relative min-h-screen overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -left-32 h-96 w-96 rounded-full bg-lavender/40 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-40 -right-24 h-80 w-80 rounded-full bg-gold/25 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-sage/30 blur-3xl"
+      />
 
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Demo gallery
-        </h2>
-
-        {!songs || songs.length === 0 ? (
-          <p className="text-neutral-500">No songs yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {songs.map((song) => {
-              const clips = (segmentsBySong.get(song.id) ?? []).sort(
-                (a, b) => (b.hook_score ?? 0) - (a.hook_score ?? 0),
-              );
-              return (
-                <Link
-                  key={song.id}
-                  href={`/songs/${song.id}`}
-                  className="block rounded-lg border border-neutral-200 p-5 hover:border-neutral-400 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{song.title}</h3>
-                    <span className="text-xs text-neutral-400 uppercase">
-                      {song.status}
-                    </span>
-                  </div>
-                  <p className="text-sm text-neutral-500">{song.artist}</p>
-
-                  {clips.length > 0 && (
-                    <ul className="mt-4 flex flex-wrap gap-2">
-                      {clips.map((clip) => {
-                        const template = clip.template_id
-                          ? templateById.get(clip.template_id)
-                          : undefined;
-                        return (
-                          <li
-                            key={clip.id}
-                            className="rounded px-2.5 py-1 text-xs font-medium text-white"
-                            style={{
-                              backgroundColor: template?.primary_color
-                                ? withReadableText(template.primary_color)
-                                : "#404040",
-                            }}
-                          >
-                            {clip.label} · {clip.platform}
-                            {typeof clip.hook_score === "number"
-                              ? ` · ${clip.hook_score.toFixed(2)}`
-                              : ""}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </Link>
-              );
-            })}
+      <div className="relative max-w-5xl mx-auto px-8 py-14 space-y-16">
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="space-y-4">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 text-gold px-3 py-1 text-xs font-semibold tracking-wide uppercase">
+              ✦ Made for musicians
+            </span>
+            <h1 className="font-display text-5xl sm:text-6xl leading-[1.05] tracking-tight text-ink">
+              Turn a song into{" "}
+              <span className="italic text-mauve">scroll-stopping</span>{" "}
+              clips
+            </h1>
+            <p className="text-ink/60 text-lg max-w-md">
+              Upload audio, get 3 platform-ready lyric clips in minutes — hook
+              scored, templated, and ready to post.
+            </p>
           </div>
-        )}
-      </section>
+          <Link
+            href="/songs/new"
+            className="self-start shrink-0 rounded-full bg-ink text-cream px-6 py-3 text-sm font-semibold hover:bg-ink/85 transition-colors shadow-[0_8px_24px_-8px_rgba(43,43,43,0.5)]"
+          >
+            New Song →
+          </Link>
+        </header>
+
+        <section className="space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="h-1.5 w-1.5 rounded-full bg-mauve" />
+            <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-ink/50">
+              Demo gallery
+            </h2>
+          </div>
+
+          {!songs || songs.length === 0 ? (
+            <p className="text-ink/50">No songs yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {songs.map((song, i) => {
+                const clips = (segmentsBySong.get(song.id) ?? []).sort(
+                  (a, b) => (b.hook_score ?? 0) - (a.hook_score ?? 0),
+                );
+                const accents = ["bg-lavender", "bg-rose", "bg-tan", "bg-sky"];
+                return (
+                  <Link
+                    key={song.id}
+                    href={`/songs/${song.id}`}
+                    className="group relative block rounded-2xl bg-cream-deep border border-ink/10 p-6 hover:border-ink/20 hover:shadow-[0_12px_32px_-16px_rgba(43,43,43,0.35)] transition-all"
+                  >
+                    <span
+                      className={`absolute top-0 left-6 h-1.5 w-10 rounded-b-full ${accents[i % accents.length]}`}
+                    />
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-display text-xl text-ink">
+                        {song.title}
+                      </h3>
+                      <span className="text-[10px] font-semibold text-ink/40 uppercase tracking-wide">
+                        {song.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-ink/50 mt-0.5">
+                      {song.artist}
+                    </p>
+
+                    {clips.length > 0 && (
+                      <ul className="mt-4 flex flex-wrap gap-1.5">
+                        {clips.map((clip) => {
+                          const template = clip.template_id
+                            ? templateById.get(clip.template_id)
+                            : undefined;
+                          return (
+                            <li
+                              key={clip.id}
+                              title={template?.name}
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                PLATFORM_STYLES[clip.platform] ??
+                                "bg-ink/10 text-ink"
+                              }`}
+                            >
+                              {clip.label} · {clip.platform}
+                              {typeof clip.hook_score === "number"
+                                ? ` · ${clip.hook_score.toFixed(2)}`
+                                : ""}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
-}
-
-// Light template colors (e.g. #ffffff) read poorly as chip backgrounds with
-// white text; fall back to neutral-800 when the color is too light.
-function withReadableText(hex: string) {
-  const c = hex.replace("#", "");
-  if (c.length !== 6) return hex;
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 180 ? "#262626" : hex;
 }

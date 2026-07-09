@@ -12,7 +12,7 @@ export function EditableLyricsTable({ lyrics }: { lyrics: Lyric[] }) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-xs text-neutral-500">
+        <tr className="text-left text-xs text-ink/50">
           <th className="font-normal pb-2 w-10">#</th>
           <th className="font-normal pb-2">Text</th>
           <th className="font-normal pb-2 w-20">Start (s)</th>
@@ -58,8 +58,8 @@ function LyricRow({ line }: { line: Lyric }) {
   }
 
   return (
-    <tr className="border-t border-neutral-100">
-      <td className="py-1.5 text-neutral-400 tabular-nums">
+    <tr className="border-t border-ink/10">
+      <td className="py-1.5 text-ink/30 tabular-nums">
         {line.line_index + 1}
       </td>
       <td className="py-1.5 pr-2">
@@ -69,7 +69,7 @@ function LyricRow({ line }: { line: Lyric }) {
             setText(e.target.value);
             markDirty();
           }}
-          className="w-full rounded border border-transparent hover:border-neutral-300 focus:border-neutral-400 px-1.5 py-1 text-sm"
+          className="w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm text-ink"
         />
       </td>
       <td className="py-1.5 pr-2">
@@ -80,7 +80,7 @@ function LyricRow({ line }: { line: Lyric }) {
             markDirty();
           }}
           inputMode="decimal"
-          className="w-full rounded border border-transparent hover:border-neutral-300 focus:border-neutral-400 px-1.5 py-1 text-sm tabular-nums"
+          className="w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm text-ink tabular-nums"
         />
       </td>
       <td className="py-1.5 pr-2">
@@ -91,7 +91,7 @@ function LyricRow({ line }: { line: Lyric }) {
             markDirty();
           }}
           inputMode="decimal"
-          className="w-full rounded border border-transparent hover:border-neutral-300 focus:border-neutral-400 px-1.5 py-1 text-sm tabular-nums"
+          className="w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm text-ink tabular-nums"
         />
       </td>
       <td className="py-1.5">
@@ -99,12 +99,12 @@ function LyricRow({ line }: { line: Lyric }) {
           <button
             onClick={handleSave}
             disabled={isPending}
-            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+            className="text-xs font-semibold text-mauve hover:underline disabled:opacity-50"
           >
             {isPending ? "Saving…" : "Save"}
           </button>
         )}
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-mauve">{error}</p>}
       </td>
     </tr>
   );

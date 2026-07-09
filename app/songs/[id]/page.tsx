@@ -10,6 +10,12 @@ import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
 import { EditableLyricsTable } from "./EditableLyricsTable";
 
+const PLATFORM_STYLES: Record<string, string> = {
+  tiktok: "bg-mauve/15 text-mauve",
+  reels: "bg-sky/25 text-ink",
+  shorts: "bg-sage/30 text-ink",
+};
+
 // Rendering a clip (ffmpeg trim + drawtext + mux) runs inline inside the
 // queueExport server action and can take longer than the 10s default.
 export const maxDuration = 60;
@@ -78,110 +84,130 @@ export default async function SongDetailPage({
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-2xl mx-auto space-y-6">
-      <Link href="/" className="text-sm text-neutral-500 hover:underline">
-        ← Back
-      </Link>
+    <main className="relative min-h-screen overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-32 h-96 w-96 rounded-full bg-lavender/30 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-96 -left-24 h-72 w-72 rounded-full bg-sage/25 blur-3xl"
+      />
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{song.title}</h1>
-        <p className="text-neutral-500">{song.artist}</p>
-      </div>
+      <div className="relative max-w-2xl mx-auto px-8 py-14 space-y-8">
+        <Link href="/" className="text-sm text-ink/50 hover:text-ink">
+          ← Back
+        </Link>
 
-      <Suspense fallback={null}>
-        <CheckoutStatusWatcher songId={song.id} />
-      </Suspense>
+        <div>
+          <h1 className="font-display text-4xl text-ink">{song.title}</h1>
+          <p className="text-ink/50 mt-1">{song.artist}</p>
+        </div>
 
-      {song.audio_url && (
-        <audio controls src={song.audio_url} className="w-full">
-          Your browser does not support the audio element.
-        </audio>
-      )}
+        <Suspense fallback={null}>
+          <CheckoutStatusWatcher songId={song.id} />
+        </Suspense>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Lyrics
-        </h2>
-
-        {!hasLyrics ? (
-          isOwner ? (
-            <div className="space-y-4">
-              <p className="text-neutral-500 text-sm">
-                Add lyrics to continue.
-              </p>
-              <LyricEntryForm songId={song.id} />
-              <div className="flex items-center gap-3 text-xs text-neutral-400">
-                <span className="h-px flex-1 bg-neutral-200" />
-                or
-                <span className="h-px flex-1 bg-neutral-200" />
-              </div>
-              <AutoTranscribeButton songId={song.id} />
-            </div>
-          ) : (
-            <p className="text-neutral-500 text-sm">No lyrics yet.</p>
-          )
-        ) : isOwner && hasTimestamps ? (
-          <EditableLyricsTable lyrics={lyrics!} />
-        ) : (
-          <ol className="space-y-1 text-sm">
-            {lyrics!.map((line) => (
-              <li key={line.id} className="text-neutral-700">
-                <span className="text-neutral-400 mr-2 tabular-nums">
-                  {line.line_index + 1}
-                </span>
-                {line.text}
-              </li>
-            ))}
-          </ol>
+        {song.audio_url && (
+          <audio
+            controls
+            src={song.audio_url}
+            className="w-full rounded-full"
+          >
+            Your browser does not support the audio element.
+          </audio>
         )}
-      </section>
 
-      {hasLyrics && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Clips
-          </h2>
+        <section className="rounded-3xl bg-cream-deep border border-ink/10 p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="h-1.5 w-1.5 rounded-full bg-lavender" />
+            <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-ink/50">
+              Lyrics
+            </h2>
+          </div>
 
-          {!hasSegments && (
+          {!hasLyrics ? (
             isOwner ? (
-              <GenerateClipsButton songId={song.id} />
+              <div className="space-y-4">
+                <p className="text-ink/50 text-sm">Add lyrics to continue.</p>
+                <LyricEntryForm songId={song.id} />
+                <div className="flex items-center gap-3 text-xs text-ink/30">
+                  <span className="h-px flex-1 bg-ink/10" />
+                  or
+                  <span className="h-px flex-1 bg-ink/10" />
+                </div>
+                <AutoTranscribeButton songId={song.id} />
+              </div>
             ) : (
-              <p className="text-neutral-500 text-sm">No clips yet.</p>
+              <p className="text-ink/50 text-sm">No lyrics yet.</p>
             )
-          )}
-
-          {hasSegments && isOwner && (
-            <SegmentsPanel
-              songId={song.id}
-              segments={segments!}
-              templates={templates ?? []}
-              exportsBySegment={exportsBySegment}
-              hasPaid={hasPaid}
-            />
-          )}
-
-          {hasSegments && !isOwner && (
-            <div className="space-y-2">
-              <p className="text-xs text-neutral-400">
-                This is a demo song — upload your own to export clips.
-              </p>
-              <ul className="flex flex-wrap gap-2">
-                {segments!.map((seg) => (
-                  <li
-                    key={seg.id}
-                    className="rounded px-2.5 py-1 text-xs font-medium bg-neutral-800 text-white"
-                  >
-                    {seg.label} · {seg.platform}
-                    {typeof seg.hook_score === "number"
-                      ? ` · ${seg.hook_score.toFixed(2)}`
-                      : ""}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          ) : isOwner && hasTimestamps ? (
+            <EditableLyricsTable lyrics={lyrics!} />
+          ) : (
+            <ol className="space-y-1.5 text-sm">
+              {lyrics!.map((line) => (
+                <li key={line.id} className="text-ink/80">
+                  <span className="text-ink/30 mr-2 tabular-nums">
+                    {line.line_index + 1}
+                  </span>
+                  {line.text}
+                </li>
+              ))}
+            </ol>
           )}
         </section>
-      )}
+
+        {hasLyrics && (
+          <section className="rounded-3xl bg-cream-deep border border-ink/10 p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-mauve" />
+              <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-ink/50">
+                Clips
+              </h2>
+            </div>
+
+            {!hasSegments &&
+              (isOwner ? (
+                <GenerateClipsButton songId={song.id} />
+              ) : (
+                <p className="text-ink/50 text-sm">No clips yet.</p>
+              ))}
+
+            {hasSegments && isOwner && (
+              <SegmentsPanel
+                songId={song.id}
+                segments={segments!}
+                templates={templates ?? []}
+                exportsBySegment={exportsBySegment}
+                hasPaid={hasPaid}
+              />
+            )}
+
+            {hasSegments && !isOwner && (
+              <div className="space-y-3">
+                <p className="text-xs text-ink/40">
+                  This is a demo song — upload your own to export clips.
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {segments!.map((seg) => (
+                    <li
+                      key={seg.id}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        PLATFORM_STYLES[seg.platform] ?? "bg-ink/10 text-ink"
+                      }`}
+                    >
+                      {seg.label} · {seg.platform}
+                      {typeof seg.hook_score === "number"
+                        ? ` · ${seg.hook_score.toFixed(2)}`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </main>
   );
 }
