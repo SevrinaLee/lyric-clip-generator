@@ -9,6 +9,8 @@ import { SegmentsPanel } from "./SegmentsPanel";
 import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
 import { EditableLyricsTable } from "./EditableLyricsTable";
+import { linesForSegment } from "@/lib/scoring";
+import { googleFontsUrl } from "@/lib/fonts";
 
 const PLATFORM_STYLES: Record<string, string> = {
   tiktok: "bg-mauve/15 text-mauve",
@@ -83,8 +85,27 @@ export default async function SongDetailPage({
     }
   }
 
+  // Precompute which lyric lines fall in each segment's window (same
+  // logic queueExport uses to build captions) so the live preview shows
+  // exactly what the export will render.
+  const linesBySegment = new Map<string, { text: string; offsetSeconds: number }[]>();
+  if (isOwner) {
+    for (const seg of segments ?? []) {
+      linesBySegment.set(
+        seg.id,
+        linesForSegment(lyrics ?? [], song.duration_seconds, seg),
+      );
+    }
+  }
+
+  const fontsUrl =
+    isOwner && hasSegments
+      ? googleFontsUrl((templates ?? []).map((t) => t.font))
+      : "";
+
   return (
     <main className="relative min-h-screen overflow-hidden">
+      {fontsUrl && <link rel="stylesheet" href={fontsUrl} />}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-24 -right-32 h-96 w-96 rounded-full bg-lavender/30 blur-3xl"
@@ -141,8 +162,8 @@ export default async function SongDetailPage({
             ) : (
               <p className="text-ink/50 text-sm">No lyrics yet.</p>
             )
-          ) : isOwner && hasTimestamps ? (
-            <EditableLyricsTable lyrics={lyrics!} />
+          ) : isOwner ? (
+            <EditableLyricsTable lyrics={lyrics!} hasTimestamps={hasTimestamps} />
           ) : (
             <ol className="space-y-1.5 text-sm">
               {lyrics!.map((line) => (
@@ -176,8 +197,10 @@ export default async function SongDetailPage({
             {hasSegments && isOwner && (
               <SegmentsPanel
                 songId={song.id}
+                audioUrl={song.audio_url}
                 segments={segments!}
                 templates={templates ?? []}
+                linesBySegment={linesBySegment}
                 exportsBySegment={exportsBySegment}
                 hasPaid={hasPaid}
               />

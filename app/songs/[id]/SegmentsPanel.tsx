@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import type { ClipSegment, Export, VideoTemplate } from "@/lib/types";
-import { queueExport, selectTemplate } from "./actions";
+import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
+import { TemplatePicker } from "./TemplatePicker";
+import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
 
 const PLATFORM_ACCENT: Record<string, string> = {
   tiktok: "bg-mauve",
@@ -11,16 +13,22 @@ const PLATFORM_ACCENT: Record<string, string> = {
   shorts: "bg-sage",
 };
 
+type PreviewLine = { text: string; offsetSeconds: number };
+
 export function SegmentsPanel({
   songId,
+  audioUrl,
   segments,
   templates,
+  linesBySegment,
   exportsBySegment,
   hasPaid,
 }: {
   songId: string;
+  audioUrl: string | null;
   segments: ClipSegment[];
   templates: VideoTemplate[];
+  linesBySegment: Map<string, PreviewLine[]>;
   exportsBySegment: Map<string, Export>;
   hasPaid: boolean;
 }) {
@@ -30,8 +38,10 @@ export function SegmentsPanel({
         <SegmentRow
           key={segment.id}
           songId={songId}
+          audioUrl={audioUrl}
           segment={segment}
           templates={templates}
+          lines={linesBySegment.get(segment.id) ?? []}
           latestExport={exportsBySegment.get(segment.id)}
           hasPaid={hasPaid}
         />
@@ -42,14 +52,18 @@ export function SegmentsPanel({
 
 function SegmentRow({
   songId,
+  audioUrl,
   segment,
   templates,
+  lines,
   latestExport,
   hasPaid,
 }: {
   songId: string;
+  audioUrl: string | null;
   segment: ClipSegment;
   templates: VideoTemplate[];
+  lines: PreviewLine[];
   latestExport?: Export;
   hasPaid: boolean;
 }) {
@@ -57,17 +71,11 @@ function SegmentRow({
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState(latestExport?.status);
   const [exportId, setExportId] = useState(latestExport?.id);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    segment.template_id,
+  );
 
-  function handleTemplateChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await selectTemplate(segment.id, e.target.value);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
-    });
-  }
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   function handleExport() {
     setError(null);
@@ -102,22 +110,22 @@ function SegmentRow({
         )}
       </div>
 
-      <label className="block text-xs text-ink/50">
-        Template
-        <select
-          value={segment.template_id ?? ""}
-          onChange={handleTemplateChange}
-          disabled={isPending}
-          className="mt-1 block w-full rounded-xl border border-ink/15 bg-cream-deep px-2.5 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-lavender"
-        >
-          {templates.length === 0 && <option value="">No templates available</option>}
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <TemplatePicker
+        segmentId={segment.id}
+        templates={templates}
+        selectedId={selectedTemplateId}
+        onSelect={setSelectedTemplateId}
+      />
+
+      {selectedTemplate && audioUrl && lines.length > 0 && (
+        <ClipPreviewPlayer
+          audioUrl={audioUrl}
+          startMs={segment.start_ms}
+          endMs={segment.end_ms}
+          lines={lines}
+          template={selectedTemplate}
+        />
+      )}
 
       {error && <p className="text-sm text-mauve">{error}</p>}
 

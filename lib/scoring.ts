@@ -83,6 +83,32 @@ function scoreWindow(
   return Math.min(1, score);
 }
 
+export type PreviewLine = { text: string; offsetSeconds: number };
+
+/**
+ * Recovers which lyric lines fall inside a segment's [start_ms, end_ms)
+ * window, with each line's offset relative to the segment start — the
+ * same windowing queueExport uses to build burned-in captions, reused
+ * here so the live preview shows exactly what the export will render.
+ */
+export function linesForSegment(
+  lyrics: Lyric[],
+  durationSeconds: number | null,
+  segment: { start_ms: number; end_ms: number; label: string },
+): PreviewLine[] {
+  const timed = timeLines(lyrics, durationSeconds);
+  const linesInWindow = timed.filter(
+    (l) => l.start_ms < segment.end_ms && l.end_ms > segment.start_ms,
+  );
+  if (linesInWindow.length === 0) {
+    return [{ text: segment.label, offsetSeconds: 0 }];
+  }
+  return linesInWindow.map((l) => ({
+    text: l.text,
+    offsetSeconds: Math.max(0, (l.start_ms - segment.start_ms) / 1000),
+  }));
+}
+
 function assignPlatform(durationMs: number): GeneratedSegment["platform"] {
   if (durationMs < 15_000) return "shorts";
   if (durationMs <= 22_000) return "tiktok";
