@@ -22,13 +22,13 @@ export default async function SongDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: song } = await supabase
-    .from("songs")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle<Song>();
+  const [{ data: song }, { data: { user } }] = await Promise.all([
+    supabase.from("songs").select("*").eq("id", id).maybeSingle<Song>(),
+    supabase.auth.getUser(),
+  ]);
 
   if (!song) notFound();
+  const isOwner = !!user && song.user_id === user.id;
 
   const [
     { data: lyrics },
@@ -104,19 +104,23 @@ export default async function SongDetailPage({
         </h2>
 
         {!hasLyrics ? (
-          <div className="space-y-4">
-            <p className="text-neutral-500 text-sm">
-              Add lyrics to continue.
-            </p>
-            <LyricEntryForm songId={song.id} />
-            <div className="flex items-center gap-3 text-xs text-neutral-400">
-              <span className="h-px flex-1 bg-neutral-200" />
-              or
-              <span className="h-px flex-1 bg-neutral-200" />
+          isOwner ? (
+            <div className="space-y-4">
+              <p className="text-neutral-500 text-sm">
+                Add lyrics to continue.
+              </p>
+              <LyricEntryForm songId={song.id} />
+              <div className="flex items-center gap-3 text-xs text-neutral-400">
+                <span className="h-px flex-1 bg-neutral-200" />
+                or
+                <span className="h-px flex-1 bg-neutral-200" />
+              </div>
+              <AutoTranscribeButton songId={song.id} />
             </div>
-            <AutoTranscribeButton songId={song.id} />
-          </div>
-        ) : hasTimestamps ? (
+          ) : (
+            <p className="text-neutral-500 text-sm">No lyrics yet.</p>
+          )
+        ) : isOwner && hasTimestamps ? (
           <EditableLyricsTable lyrics={lyrics!} />
         ) : (
           <ol className="space-y-1 text-sm">
@@ -138,9 +142,15 @@ export default async function SongDetailPage({
             Clips
           </h2>
 
-          {!hasSegments ? (
-            <GenerateClipsButton songId={song.id} />
-          ) : (
+          {!hasSegments && (
+            isOwner ? (
+              <GenerateClipsButton songId={song.id} />
+            ) : (
+              <p className="text-neutral-500 text-sm">No clips yet.</p>
+            )
+          )}
+
+          {hasSegments && isOwner && (
             <SegmentsPanel
               songId={song.id}
               segments={segments!}
@@ -148,6 +158,27 @@ export default async function SongDetailPage({
               exportsBySegment={exportsBySegment}
               hasPaid={hasPaid}
             />
+          )}
+
+          {hasSegments && !isOwner && (
+            <div className="space-y-2">
+              <p className="text-xs text-neutral-400">
+                This is a demo song — upload your own to export clips.
+              </p>
+              <ul className="flex flex-wrap gap-2">
+                {segments!.map((seg) => (
+                  <li
+                    key={seg.id}
+                    className="rounded px-2.5 py-1 text-xs font-medium bg-neutral-800 text-white"
+                  >
+                    {seg.label} · {seg.platform}
+                    {typeof seg.hook_score === "number"
+                      ? ` · ${seg.hook_score.toFixed(2)}`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}
