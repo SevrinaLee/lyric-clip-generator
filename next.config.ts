@@ -19,7 +19,11 @@ const nextConfig: NextConfig = {
   // so Vercel's output file tracer won't include it in the serverless
   // bundle unless told to explicitly.
   outputFileTracingIncludes: {
-    "/songs/[id]": ["./assets/fonts/*"],
+    // ffmpeg-static's binary is resolved dynamically (based on
+    // process.platform/arch) inside its own index.js, which Vercel's
+    // output file tracer can't always follow — force-include it so the
+    // actual linux binary lands in the serverless function bundle.
+    "/songs/[id]": ["./assets/fonts/*", "./node_modules/ffmpeg-static/**"],
   },
 };
 
