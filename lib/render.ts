@@ -4,15 +4,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 
-// Next.js bundles Noto Sans (SIL OFL) for @vercel/og image generation.
-// Reusing it here avoids fetching/bundling a separate font for burned-in
-// lyric text, and it ships on every Next.js install (local + Vercel).
+// Vendored copy of Next.js's bundled Noto Sans (SIL OFL) — see assets/fonts.
+// require.resolve("next/package.json") is NOT safe here: in Vercel's
+// production webpack bundle it can resolve to an internal numeric module id
+// instead of a real filesystem path, which crashes path.join at runtime.
+// process.cwd() is reliable in both dev and the serverless bundle.
 function notoSansPath(): string {
-  const nextPkg = require.resolve("next/package.json");
-  return path.join(
-    path.dirname(nextPkg),
-    "dist/compiled/@vercel/og/noto-sans-v27-latin-regular.ttf",
-  );
+  return path.join(process.cwd(), "assets/fonts/noto-sans-regular.ttf");
 }
 
 function escapeDrawtext(text: string): string {

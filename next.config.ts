@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   // Keep ffmpeg-static's binary path resolution (based on __dirname) intact
   // at runtime — bundling it rewrites __dirname to a placeholder path.
   serverExternalPackages: ["ffmpeg-static"],
+  // assets/fonts/noto-sans-regular.ttf is read via a runtime path.join()
+  // string (passed to ffmpeg as a CLI arg), not a traceable fs/require call,
+  // so Vercel's output file tracer won't include it in the serverless
+  // bundle unless told to explicitly.
+  outputFileTracingIncludes: {
+    "/songs/[id]": ["./assets/fonts/*"],
+  },
 };
 
 export default nextConfig;
