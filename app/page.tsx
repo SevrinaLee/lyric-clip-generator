@@ -49,7 +49,7 @@ export default async function Home() {
         <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div className="space-y-4">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 text-gold px-3 py-1 text-xs font-semibold tracking-wide uppercase">
-              ✦ Made for musicians
+              ✦ For musicians, poets & every kind of creator
             </span>
             <h1 className="font-display text-5xl sm:text-6xl leading-[1.05] tracking-tight text-ink">
               Turn a song into{" "}
@@ -57,8 +57,9 @@ export default async function Home() {
               clips
             </h1>
             <p className="text-ink/60 text-lg max-w-md">
-              Upload audio, get 3 platform-ready lyric clips in minutes — hook
-              scored, templated, and ready to post.
+              No editing skills needed. Upload any audio — originals, covers,
+              poetry, podcasts — and get 3 platform-ready lyric clips in
+              minutes, hook scored and ready to post.
             </p>
           </div>
           <Link

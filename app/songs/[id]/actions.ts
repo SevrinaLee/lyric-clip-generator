@@ -98,6 +98,32 @@ export async function updateLyricTiming(
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
 }
 
+// Used by TapTimingTool: the user taps along to the whole song locally
+// (no network calls mid-session, so playback stays smooth), then this
+// persists every captured line in one round trip.
+export async function bulkUpdateLyricTimings(
+  updates: { id: string; start_ms: number; end_ms: number }[],
+) {
+  if (updates.length === 0) return;
+
+  const supabase = await createClient();
+  const { data: lyric } = await supabase
+    .from("lyrics")
+    .select("song_id")
+    .eq("id", updates[0].id)
+    .maybeSingle<{ song_id: string }>();
+
+  for (const u of updates) {
+    const { error } = await supabase
+      .from("lyrics")
+      .update({ start_ms: u.start_ms, end_ms: u.end_ms })
+      .eq("id", u.id);
+    if (error) throw new Error(`Could not save timing: ${error.message}`);
+  }
+
+  if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
+}
+
 // Deleting doesn't renumber remaining rows' line_index — the UI displays
 // each line's position in the fetched (already line_index-ordered) array
 // rather than the stored line_index, so gaps left by a delete are never

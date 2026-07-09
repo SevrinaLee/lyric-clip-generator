@@ -1,5 +1,5 @@
 import { constructWebhookEvent } from "@/lib/stripe";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
@@ -12,6 +12,12 @@ import type Stripe from "stripe";
  * docs/SECURITY.md: validate the stripe-signature header before any DB
  * write, and never return a non-2xx for handler errors (Stripe retries
  * those) — only for genuine signature failures.
+ *
+ * Uses the service-role client: a webhook request carries no user session
+ * (it's server-to-server, authenticated by the Stripe signature instead),
+ * so it can never satisfy RLS's `auth.uid() = user_id` checks — the
+ * cookie-based client used everywhere else would silently write zero rows
+ * here.
  */
 export async function POST(request: Request) {
   const payload = await request.text();
@@ -29,14 +35,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       const paymentId = session.metadata?.paymentId;
+
       if (paymentId) {
-        await supabase
+        const { data: payment } = await supabase
           .from("payments")
           .update({
             status: "paid",
@@ -45,7 +52,22 @@ export async function POST(request: Request) {
                 ? session.payment_intent
                 : (session.payment_intent?.id ?? null),
           })
-          .eq("id", paymentId);
+          .eq("id", paymentId)
+          .select("user_id")
+          .maybeSingle<{ user_id: string | null }>();
+
+        const customerId =
+          typeof session.customer === "string"
+            ? session.customer
+            : session.customer?.id;
+
+        if (payment?.user_id && customerId) {
+          await supabase.from("profiles").upsert({
+            id: payment.user_id,
+            stripe_customer_id: customerId,
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
     }
   } catch (err) {

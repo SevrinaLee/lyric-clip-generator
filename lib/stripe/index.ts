@@ -103,6 +103,21 @@ export async function createSongCheckoutSession({
   return stripe.checkout.sessions.create(params, stripeAccountOptions());
 }
 
+// ─── Billing portal ───────────────────────────────────────────────────────────
+
+export async function createPortalSession({
+  customerId,
+  returnUrl,
+}: {
+  customerId: string;
+  returnUrl: string;
+}) {
+  return stripe.billingPortal.sessions.create(
+    { customer: customerId, return_url: returnUrl },
+    stripeAccountOptions(),
+  );
+}
+
 // ─── Webhook ──────────────────────────────────────────────────────────────────
 
 export function constructWebhookEvent(payload: string, signature: string) {

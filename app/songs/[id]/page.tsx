@@ -8,7 +8,8 @@ import { GenerateClipsButton } from "./GenerateClipsButton";
 import { SegmentsPanel } from "./SegmentsPanel";
 import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
-import { EditableLyricsTable, type EditableLine } from "./EditableLyricsTable";
+import type { EditableLine } from "./EditableLyricsTable";
+import { LyricsEditPanel } from "./LyricsEditPanel";
 import { linesForSegment, timeLines } from "@/lib/scoring";
 import { googleFontsUrl } from "@/lib/fonts";
 
@@ -175,7 +176,7 @@ export default async function SongDetailPage({
               <p className="text-ink/50 text-sm">No lyrics yet.</p>
             )
           ) : isOwner ? (
-            <EditableLyricsTable lyrics={editableLyrics} />
+            <LyricsEditPanel lyrics={editableLyrics} audioUrl={song.audio_url} />
           ) : (
             <ol className="space-y-1.5 text-sm">
               {lyrics!.map((line) => (

@@ -9,17 +9,25 @@ export async function AuthStatus() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="flex justify-end p-3 text-sm">
+    <nav className="flex items-center justify-between p-3 text-sm">
+      <Link href="/" className="font-display text-sm text-ink/70 hover:text-ink">
+        Lyric Clip Generator
+      </Link>
+
       {user ? (
-        <form action={signOut} className="flex items-center gap-3">
-          <span className="text-ink/50">{user.email}</span>
-          <button
-            className="rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5 transition-colors"
-            type="submit"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/account" className="text-ink/50 hover:text-ink">
+            Account
+          </Link>
+          <form action={signOut}>
+            <button
+              className="rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5 transition-colors"
+              type="submit"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       ) : (
         <Link
           href="/login"
@@ -28,6 +36,6 @@ export async function AuthStatus() {
           Log in
         </Link>
       )}
-    </div>
+    </nav>
   );
 }
