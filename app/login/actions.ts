@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signIn(formData: FormData) {
@@ -33,6 +34,26 @@ export async function signUp(formData: FormData) {
   }
 
   redirect(redirectTo);
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  const email = String(formData.get("email") ?? "");
+  if (!email) throw new Error("Enter your email address");
+
+  const headerList = await headers();
+  const host = headerList.get("host");
+  const proto =
+    headerList.get("x-forwarded-proto") ??
+    (host?.startsWith("localhost") ? "http" : "https");
+  const origin = host
+    ? `${proto}://${host}`
+    : (process.env.NEXT_PUBLIC_APP_URL ?? "");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?redirect=/reset-password`,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function signOut() {

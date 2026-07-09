@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { VideoTemplate } from "@/lib/types";
 import { readableTextColor } from "@/lib/fonts";
+import { cssBackground, parseBackgroundStyle } from "@/lib/backgrounds";
 import { selectTemplate } from "./actions";
 
 const SWATCH_ANIMATION: Record<VideoTemplate["animation_preset"], string> = {
@@ -65,7 +66,12 @@ export function TemplatePicker({
             >
               <span
                 className="flex h-12 w-12 items-center justify-center rounded-lg text-sm font-semibold"
-                style={{ backgroundColor: t.primary_color, color: textColor }}
+                style={{
+                  background: cssBackground(
+                    parseBackgroundStyle(t.background_style, t.primary_color),
+                  ),
+                  color: textColor,
+                }}
               >
                 <span
                   className={SWATCH_ANIMATION[t.animation_preset]}

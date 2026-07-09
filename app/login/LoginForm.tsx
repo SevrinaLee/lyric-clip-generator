@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { unstable_rethrow } from "next/navigation";
 import { signIn, signUp } from "./actions";
 
@@ -94,6 +95,17 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
               : "Create account"}
         </button>
       </form>
+
+      {mode === "login" && (
+        <p className="text-center">
+          <Link
+            href="/forgot-password"
+            className="text-xs text-ink/50 hover:text-ink underline underline-offset-2"
+          >
+            Forgot password?
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

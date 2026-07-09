@@ -284,6 +284,7 @@ export async function queueExport(segmentId: string) {
       lines: renderLines,
       primaryColor: template.primary_color,
       animationPreset: template.animation_preset,
+      backgroundStyle: template.background_style,
     });
 
     const path = `${exportRow.id}.mp4`;

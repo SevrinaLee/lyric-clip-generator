@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { VideoTemplate } from "@/lib/types";
-import { readableTextColor } from "@/lib/fonts";
+import { cssBackground, parseBackgroundStyle } from "@/lib/backgrounds";
 
 type PreviewLine = { text: string; offsetSeconds: number };
 
@@ -30,7 +30,6 @@ export function ClipPreviewPlayer({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const durationSeconds = (endMs - startMs) / 1000;
-  const textColor = readableTextColor(template.primary_color);
 
   function handleToggle() {
     const audio = audioRef.current;
@@ -71,14 +70,19 @@ export function ClipPreviewPlayer({
     <div className="flex items-center gap-3">
       <div
         className="relative aspect-9/16 w-28 shrink-0 overflow-hidden rounded-xl"
-        style={{ backgroundColor: template.primary_color }}
+        style={{
+          background: cssBackground(
+            parseBackgroundStyle(template.background_style, template.primary_color),
+          ),
+        }}
       >
         <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
+          {/* Mirrors the export's ASS style: white text on a ~65% black box,
+              which keeps captions readable over any background visual. */}
           <span
             key={activeIndex}
-            className={`rounded bg-black/35 px-1.5 py-1 text-[11px] font-medium leading-tight ${LINE_ANIMATION[template.animation_preset]}`}
+            className={`rounded bg-black/60 px-1.5 py-1 text-[11px] font-medium leading-tight text-white ${LINE_ANIMATION[template.animation_preset]}`}
             style={{
-              color: textColor,
               fontFamily: `"${template.font}", sans-serif`,
             }}
           >

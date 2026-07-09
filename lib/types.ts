@@ -27,6 +27,7 @@ export type VideoTemplate = {
   font: string;
   primary_color: string;
   animation_preset: "fade" | "bounce" | "typewriter";
+  background_style: string;
   created_at: string;
 };
 

@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
+import { parseBackgroundStyle } from "./backgrounds";
 
 // Vendored copy of Next.js's bundled Noto Sans (SIL OFL) — see assets/fonts.
 // require.resolve("next/package.json") is NOT safe here: in Vercel's
@@ -94,6 +95,21 @@ function run(cmd: string, args: string[]): Promise<void> {
 
 export type RenderLine = { text: string; offsetSeconds: number };
 
+// lavfi source for the video background. Solid templates keep the flat
+// color; gradient templates use the `gradients` source with a slow drift
+// (speed) so the backdrop feels alive without competing with the captions.
+function backgroundSource(
+  backgroundStyle: string | null | undefined,
+  primaryColor: string,
+): string {
+  const bg = parseBackgroundStyle(backgroundStyle, primaryColor);
+  if (bg.type === "gradient") {
+    return `gradients=s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:c0=${bg.colors[0]}:c1=${bg.colors[1]}:x0=0:y0=0:x1=${VIDEO_WIDTH}:y1=${VIDEO_HEIGHT}:speed=0.03`;
+  }
+  const color = bg.color.startsWith("#") ? bg.color : `#${bg.color}`;
+  return `color=c=${color}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}`;
+}
+
 export async function renderClip({
   audioUrl,
   startMs,
@@ -101,6 +117,7 @@ export async function renderClip({
   lines,
   primaryColor,
   animationPreset,
+  backgroundStyle,
 }: {
   audioUrl: string;
   startMs: number;
@@ -108,6 +125,7 @@ export async function renderClip({
   lines: RenderLine[];
   primaryColor: string;
   animationPreset: "fade" | "bounce" | "typewriter";
+  backgroundStyle?: string | null;
 }): Promise<Buffer> {
   if (!ffmpegPath) throw new Error("ffmpeg binary not found");
 
@@ -126,7 +144,6 @@ export async function renderClip({
 
     await writeFile(assPath, buildAssSubtitle(lines, durationSeconds, animationPreset));
 
-    const bg = primaryColor.startsWith("#") ? primaryColor : `#${primaryColor}`;
     const assFilterPath = escapeFilterPath(assPath);
     const fontsDirPath = escapeFilterPath(FONTS_DIR);
 
@@ -137,7 +154,7 @@ export async function renderClip({
       "-i", sourcePath,
       "-f", "lavfi",
       "-t", String(durationSeconds),
-      "-i", `color=c=${bg}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}`,
+      "-i", backgroundSource(backgroundStyle, primaryColor),
       "-filter_complex", `[1:v]ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`,
       "-map", "[v]",
       "-map", "0:a",
