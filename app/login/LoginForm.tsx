@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { unstable_rethrow } from "next/navigation";
-import { signIn, signInWithGoogle, signUp } from "./actions";
+import { signIn, signUp } from "./actions";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -34,22 +34,6 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         Check your email to confirm your account, then log in.
       </p>
     );
-  }
-
-  function handleGoogle() {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await signInWithGoogle(redirectTo);
-      } catch (err) {
-        unstable_rethrow(err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Google sign-in isn't configured yet",
-        );
-      }
-    });
   }
 
   return (
@@ -110,20 +94,6 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
               : "Create account"}
         </button>
       </form>
-
-      <div className="flex items-center gap-3 text-xs text-neutral-400">
-        <span className="h-px flex-1 bg-neutral-200" />
-        or
-        <span className="h-px flex-1 bg-neutral-200" />
-      </div>
-
-      <button
-        onClick={handleGoogle}
-        disabled={isPending}
-        className="w-full rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
-      >
-        Continue with Google
-      </button>
     </div>
   );
 }

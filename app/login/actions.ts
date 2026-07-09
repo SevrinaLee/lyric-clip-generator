@@ -24,29 +24,15 @@ export async function signUp(formData: FormData) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw new Error(error.message);
 
-  // With email confirmation enabled (this project's default), signUp
-  // creates the user but no session until they click the confirmation
-  // link — redirecting immediately would just bounce off the next
-  // authenticated route. Tell the caller so it can show that instead.
+  // Email confirmation is off (Supabase's default shared mailer is
+  // rate-limited to a couple sends/hour and not viable for production),
+  // so signUp already returns a session. The needsConfirmation branch is
+  // kept in case confirmation gets turned back on with real SMTP later.
   if (!data.session) {
     return { needsConfirmation: true as const };
   }
 
   redirect(redirectTo);
-}
-
-export async function signInWithGoogle(redirectTo: string) {
-  const supabase = await createClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${appUrl}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
-    },
-  });
-  if (error) throw new Error(error.message);
-  if (data.url) redirect(data.url);
 }
 
 export async function signOut() {
