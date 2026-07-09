@@ -48,7 +48,7 @@ export default function PricingPage() {
                 One-off
               </h2>
               <p className="mt-2">
-                <span className="font-display text-4xl text-ink">$4.99</span>
+                <span className="font-display text-4xl text-ink">S$4.99</span>
                 <span className="text-ink/50 text-sm"> / song</span>
               </p>
             </div>
@@ -77,7 +77,7 @@ export default function PricingPage() {
                 Subscription
               </h2>
               <p className="mt-2">
-                <span className="font-display text-4xl">$14.99</span>
+                <span className="font-display text-4xl">S$14.99</span>
                 <span className="text-cream/50 text-sm"> / month</span>
               </p>
             </div>
@@ -99,6 +99,7 @@ export default function PricingPage() {
         </div>
 
         <p className="text-center text-sm text-ink/50">
+          Pay by card, PayNow QR, or GrabPay — secure checkout via Stripe.
           Checkout happens when you export your first clip — upload a song,
           pick your favorite moment, and choose a plan at the download step.
           Manage or cancel your subscription anytime from{" "}

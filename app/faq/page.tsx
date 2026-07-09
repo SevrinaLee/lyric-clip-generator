@@ -23,7 +23,11 @@ const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How much does exporting cost?",
-    a: "Either $4.99 once to unlock all exports for a single song, or $14.99/month for unlimited exports across all your songs. See the Pricing page for details.",
+    a: "Either S$4.99 once to unlock all exports for a single song, or S$14.99/month for unlimited exports across all your songs. See the Pricing page for details.",
+  },
+  {
+    q: "What payment methods are accepted?",
+    a: "Checkout is powered by Stripe and accepts credit/debit cards, PayNow QR, and GrabPay. Subscriptions renew automatically and require a card; one-off song unlocks work with any of the methods.",
   },
   {
     q: "How do I cancel my subscription?",

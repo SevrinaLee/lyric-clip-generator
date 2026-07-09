@@ -46,9 +46,18 @@ export const stripeAccountOptions = (): Stripe.RequestOptions | undefined =>
 // Uses inline `price_data` instead of pre-created Stripe Price objects — the
 // app is pre-auth (v1, no user accounts yet) and there's no dashboard step
 // to create Products/Prices ahead of time, so amounts are defined here.
+//
+// Payment methods are dashboard-controlled: we deliberately do NOT pass
+// payment_method_types, so Checkout automatically offers every method
+// enabled in the Stripe dashboard that's compatible with the session —
+// cards, PayNow QR, GrabPay, Alipay, … Currency is SGD because PayNow
+// and GrabPay only work for SGD charges on a Singapore Stripe account.
+// Subscription sessions automatically narrow to recurring-capable
+// methods (cards), so no special-casing is needed here.
 
-const SINGLE_SONG_CENTS = 499;
-const SUBSCRIPTION_MONTHLY_CENTS = 1499;
+const CURRENCY = "sgd";
+const SINGLE_SONG_CENTS = 499; // S$4.99
+const SUBSCRIPTION_MONTHLY_CENTS = 1499; // S$14.99
 
 export async function createSongCheckoutSession({
   songTitle,
@@ -74,7 +83,7 @@ export async function createSongCheckoutSession({
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: CURRENCY,
           product_data: { name: `${songTitle} — export unlock` },
           unit_amount: unitAmount,
           ...(mode === "subscription"

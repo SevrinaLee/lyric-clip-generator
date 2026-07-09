@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Payment, Song } from "@/lib/types";
 import { PasswordForm } from "./PasswordForm";
+import { DisplayNameForm } from "./DisplayNameForm";
 import { BillingButton } from "./BillingButton";
 
 export default async function AccountPage() {
@@ -12,6 +13,12 @@ export default async function AccountPage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login?redirect=/account");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .maybeSingle<{ display_name: string | null }>();
 
   const { data: payments } = await supabase
     .from("payments")
@@ -44,7 +51,11 @@ export default async function AccountPage() {
         </Link>
 
         <div>
-          <h1 className="font-display text-4xl text-ink">Account</h1>
+          <h1 className="font-display text-4xl text-ink">
+            {profile?.display_name
+              ? `Hey, ${profile.display_name}`
+              : "Account"}
+          </h1>
           <p className="text-ink/50 mt-1">{user.email}</p>
         </div>
 
@@ -55,7 +66,10 @@ export default async function AccountPage() {
               Profile
             </h2>
           </div>
-          <PasswordForm />
+          <DisplayNameForm initialName={profile?.display_name ?? ""} />
+          <div className="border-t border-ink/10 pt-4">
+            <PasswordForm />
+          </div>
         </section>
 
         <section className="rounded-3xl bg-cream-deep border border-ink/10 p-6 space-y-4">
@@ -81,7 +95,7 @@ export default async function AccountPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-ink/50">
-                      ${(p.amount_cents / 100).toFixed(2)}
+                      S${(p.amount_cents / 100).toFixed(2)}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${

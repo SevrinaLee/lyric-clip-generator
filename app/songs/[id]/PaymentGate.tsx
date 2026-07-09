@@ -35,7 +35,7 @@ export function PaymentGate({ songId }: { songId: string }) {
         disabled={loadingPlan !== null}
         className="rounded-full bg-gold text-ink px-4 py-2 text-sm font-semibold hover:bg-gold/85 transition-colors disabled:opacity-50"
       >
-        {loadingPlan === "single" ? "Redirecting…" : "Pay $4.99 to download"}
+        {loadingPlan === "single" ? "Redirecting…" : "Pay S$4.99 to download"}
       </button>
       <button
         onClick={() => startCheckout("subscription")}
@@ -44,8 +44,11 @@ export function PaymentGate({ songId }: { songId: string }) {
       >
         {loadingPlan === "subscription"
           ? "Redirecting…"
-          : "Subscribe $14.99/mo"}
+          : "Subscribe S$14.99/mo"}
       </button>
+      <span className="text-xs text-ink/50 w-full">
+        Card · PayNow QR · GrabPay — secure checkout via Stripe
+      </span>
       {error && <p className="text-sm text-mauve w-full">{error}</p>}
     </div>
   );
