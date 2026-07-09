@@ -98,9 +98,12 @@ export async function updateLyricTiming(
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
 }
 
-// For manually-pasted lyrics (pre-Whisper), there's no real start_ms/end_ms
-// to edit — just the text.
-export async function updateLyricText(lyricId: string, text: string) {
+// Deleting doesn't renumber remaining rows' line_index — the UI displays
+// each line's position in the fetched (already line_index-ordered) array
+// rather than the stored line_index, so gaps left by a delete are never
+// visible, and lib/scoring.ts's timing estimate only cares about that same
+// array position too.
+export async function deleteLyric(lyricId: string) {
   const supabase = await createClient();
   const { data: lyric } = await supabase
     .from("lyrics")
@@ -108,11 +111,8 @@ export async function updateLyricText(lyricId: string, text: string) {
     .eq("id", lyricId)
     .maybeSingle<{ song_id: string }>();
 
-  const { error } = await supabase
-    .from("lyrics")
-    .update({ text })
-    .eq("id", lyricId);
-  if (error) throw new Error(`Could not update line: ${error.message}`);
+  const { error } = await supabase.from("lyrics").delete().eq("id", lyricId);
+  if (error) throw new Error(`Could not delete line: ${error.message}`);
 
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
 }

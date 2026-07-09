@@ -8,8 +8,8 @@ import { GenerateClipsButton } from "./GenerateClipsButton";
 import { SegmentsPanel } from "./SegmentsPanel";
 import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
-import { EditableLyricsTable } from "./EditableLyricsTable";
-import { linesForSegment } from "@/lib/scoring";
+import { EditableLyricsTable, type EditableLine } from "./EditableLyricsTable";
+import { linesForSegment, timeLines } from "@/lib/scoring";
 import { googleFontsUrl } from "@/lib/fonts";
 
 const PLATFORM_STYLES: Record<string, string> = {
@@ -74,7 +74,19 @@ export default async function SongDetailPage({
   const hasLyrics = (lyrics?.length ?? 0) > 0;
   const hasSegments = (segments?.length ?? 0) > 0;
   const hasPaid = (paidPayments?.length ?? 0) > 0;
-  const hasTimestamps = (lyrics ?? []).some((l) => l.start_ms != null);
+
+  // For the owner's edit view: every line gets a start/end to show (real if
+  // set, lib/scoring.ts's estimate otherwise), flagged so the UI can hint
+  // which is which — matches the same estimate queueExport/the preview use.
+  const editableLyrics: EditableLine[] =
+    isOwner && lyrics
+      ? timeLines(lyrics, song.duration_seconds).map((t, i) => ({
+          ...lyrics[i],
+          start_ms: t.start_ms,
+          end_ms: t.end_ms,
+          isEstimated: lyrics[i].start_ms == null,
+        }))
+      : [];
 
   // Latest export per clip_segment_id (exports is queried unfiltered since
   // there's no FK to song_id — fine at this dataset size for v1).
@@ -163,7 +175,7 @@ export default async function SongDetailPage({
               <p className="text-ink/50 text-sm">No lyrics yet.</p>
             )
           ) : isOwner ? (
-            <EditableLyricsTable lyrics={lyrics!} hasTimestamps={hasTimestamps} />
+            <EditableLyricsTable lyrics={editableLyrics} />
           ) : (
             <ol className="space-y-1.5 text-sm">
               {lyrics!.map((line) => (

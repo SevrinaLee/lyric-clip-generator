@@ -16,27 +16,19 @@ export type GeneratedSegment = {
 export type TimedLine = { text: string; start_ms: number; end_ms: number };
 
 /**
- * Fills in start_ms/end_ms for lines that don't have real timestamps yet
- * (manual paste, pre-Whisper). Spreads lines evenly across the known song
- * duration when available, otherwise assumes a fixed per-line duration —
- * this is what lets the pipeline run before Sprint 4 adds real transcription.
+ * Fills in start_ms/end_ms for any line that doesn't have a real timestamp
+ * yet (manual paste, pre-Whisper, or simply never corrected by hand) —
+ * spreading lines evenly across the known song duration, or a fixed
+ * per-line duration if the duration is unknown. Lines that DO have a real
+ * timestamp (from Whisper, or a user's manual correction) keep it as-is,
+ * so partially-corrected lyrics use real timing where available and only
+ * estimate the rest.
  *
  * Deterministic given the same lyrics + duration, so the render step can
  * call this again to recover which lines fall inside a given segment
  * window without persisting the estimate anywhere.
  */
 export function timeLines(lyrics: Lyric[], durationSeconds: number | null): TimedLine[] {
-  const hasRealTimestamps = lyrics.every(
-    (l) => l.start_ms != null && l.end_ms != null,
-  );
-  if (hasRealTimestamps) {
-    return lyrics.map((l) => ({
-      text: l.text,
-      start_ms: l.start_ms!,
-      end_ms: l.end_ms!,
-    }));
-  }
-
   const perLineMs =
     durationSeconds && durationSeconds > 0
       ? (durationSeconds * 1000) / lyrics.length
@@ -44,8 +36,8 @@ export function timeLines(lyrics: Lyric[], durationSeconds: number | null): Time
 
   return lyrics.map((l, i) => ({
     text: l.text,
-    start_ms: Math.round(i * perLineMs),
-    end_ms: Math.round((i + 1) * perLineMs),
+    start_ms: l.start_ms ?? Math.round(i * perLineMs),
+    end_ms: l.end_ms ?? Math.round((i + 1) * perLineMs),
   }));
 }
 
