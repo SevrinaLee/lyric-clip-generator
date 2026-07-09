@@ -18,9 +18,14 @@ export async function addLyrics(songId: string, rawText: string) {
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to add lyrics");
 
   const rows = lines.map((text, index) => ({
     song_id: songId,
+    user_id: user.id,
     line_index: index,
     text,
   }));
@@ -35,6 +40,10 @@ export async function addLyrics(songId: string, rawText: string) {
 
 export async function transcribeLyrics(songId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to transcribe lyrics");
 
   const { data: song } = await supabase
     .from("songs")
@@ -56,6 +65,7 @@ export async function transcribeLyrics(songId: string) {
 
   const rows = lines.map((line, index) => ({
     song_id: songId,
+    user_id: user.id,
     line_index: index,
     text: line.text,
     start_ms: line.start_ms,
@@ -90,6 +100,10 @@ export async function updateLyricTiming(
 
 export async function generateClips(songId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to generate clips");
 
   const [{ data: song }, { data: lyrics }, { data: existing }, { data: templates }] =
     await Promise.all([
@@ -124,6 +138,7 @@ export async function generateClips(songId: string) {
   const templateList = templates ?? [];
   const rows = segments.map((seg, i) => ({
     song_id: songId,
+    user_id: user.id,
     label: seg.label,
     start_ms: seg.start_ms,
     end_ms: seg.end_ms,
@@ -162,6 +177,10 @@ export async function selectTemplate(segmentId: string, templateId: string) {
 
 export async function queueExport(segmentId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to export a clip");
 
   const { data: segment } = await supabase
     .from("clip_segments")
@@ -198,6 +217,7 @@ export async function queueExport(segmentId: string) {
     .from("exports")
     .insert({
       clip_segment_id: segmentId,
+      user_id: user.id,
       status: "rendering",
       platform: segment.platform,
     })

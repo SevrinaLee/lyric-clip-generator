@@ -12,10 +12,12 @@ const AMOUNT_CENTS: Record<"single" | "subscription", number> = {
  * POST /api/stripe/checkout
  * Body: { songId: string, plan: "single" | "subscription" }
  *
- * Pre-auth v1 flow (docs/TASKS.md Sprint 3): no signed-in user yet, so the
- * payment is tied to the song being exported, not an account. Creates a
- * `payments` row up front (status "pending") and a Stripe Checkout Session
- * whose metadata links back to it; the webhook flips it to "paid".
+ * Payment is tied to the song being exported (docs/TASKS.md Sprint 3) and,
+ * since Sprint 5, to the signed-in account that owns it — reaching this
+ * route already implies a session because queueExport (the only way an
+ * export/song gets created) requires one. Creates a `payments` row up
+ * front (status "pending") and a Stripe Checkout Session whose metadata
+ * links back to it; the webhook flips it to "paid".
  */
 export async function POST(request: Request) {
   try {
@@ -32,6 +34,13 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data: song } = await supabase
       .from("songs")
       .select("*")
@@ -46,6 +55,7 @@ export async function POST(request: Request) {
       .from("payments")
       .insert({
         song_id: songId,
+        user_id: user.id,
         amount_cents: AMOUNT_CENTS[plan],
         status: "pending",
         plan,

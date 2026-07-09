@@ -26,6 +26,10 @@ export async function createSong(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to upload a song");
 
   const ext = file.name.split(".").pop() || "mp3";
   const path = `${crypto.randomUUID()}.${ext}`;
@@ -45,6 +49,7 @@ export async function createSong(formData: FormData) {
   const { data: song, error: insertError } = await supabase
     .from("songs")
     .insert({
+      user_id: user.id,
       title,
       artist,
       audio_url: publicUrl,

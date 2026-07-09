@@ -35,7 +35,19 @@ export async function updateSession(request: NextRequest) {
     });
 
     // Refresh session so it doesn't expire while user is active
-    await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Lock-down (docs/TASKS.md Sprint 5): uploading requires an account so
+    // new content has an owner; the demo gallery and existing song pages
+    // stay reachable anonymously (RLS itself decides what's visible there).
+    if (!user && request.nextUrl.pathname.startsWith("/songs/new")) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", request.nextUrl.pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
     return response;
   } catch {
     // Never let an auth hiccup crash the entire edge middleware
