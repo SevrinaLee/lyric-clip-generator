@@ -40,9 +40,24 @@ function parseEnvFile(file) {
   return out;
 }
 
+/**
+ * Normalize a secret/URL value from ANY source (CI secret or .env.local):
+ * strip a BOM (this project's .env.local has one on the service key), CR/LF,
+ * surrounding quotes, and whitespace. A value pasted into a GitHub secret
+ * with a stray BOM would otherwise silently produce a malformed JWT.
+ */
+function clean(v) {
+  if (v == null) return v;
+  return String(v)
+    .replace(/﻿/g, "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+}
+
 export function loadEnv() {
   const fileEnv = parseEnvFile(path.join(REPO_ROOT, ".env.local"));
-  const get = (k) => process.env[k] || fileEnv[k];
+  const get = (k) => clean(process.env[k] || fileEnv[k]);
 
   const url = get("NEXT_PUBLIC_SUPABASE_URL");
   const anonKey = get("NEXT_PUBLIC_SUPABASE_ANON_KEY");

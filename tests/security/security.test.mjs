@@ -32,6 +32,19 @@ const ctx = {
 };
 
 before(async () => {
+  // Preflight: fail fast with a clear message if the credentials are wrong
+  // (e.g. a BOM/whitespace pasted into a CI secret makes the JWT malformed).
+  const { error: adminErr } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1,
+  });
+  assert.equal(
+    adminErr,
+    null,
+    `SUPABASE_SERVICE_ROLE_KEY looks invalid (admin call failed: ${adminErr?.message}). ` +
+      "Check the secret has no stray BOM/whitespace and matches this project.",
+  );
+
   // Two disposable users, each with their own private data owned by A.
   const emailA = randomEmail("a");
   const emailB = randomEmail("b");
