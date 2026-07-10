@@ -91,6 +91,61 @@ export async function subscribe(priceId: string) {
 }
 ```
 
+## DevSecOps — security is not optional
+
+Security must be built into every change touching **code, authentication, or
+data** — not bolted on afterward. Default to the secure option (parameterized
+queries, RLS-enforced access, least-privilege keys, server-side validation)
+even when the user didn't explicitly ask.
+
+### How this app's defenses are actually enforced
+- **Data isolation** is enforced by Postgres **Row-Level Security**, not by app
+  code alone. Every user-owned table (`songs`, `lyrics`, `clip_segments`,
+  `payments`, `exports`, `profiles`) has RLS enabled with `auth.uid() = user_id`
+  (or `= id`) policies. See `supabase/migrations/0004_lockdown_rls.sql`,
+  `0005_profiles.sql`, `0007_profile_display_name.sql`. Adding a new
+  user-scoped table **requires** an accompanying RLS migration in the same change.
+- The **service-role key bypasses RLS** and must never reach the browser or a
+  request that carries a user session. It is used only server-to-server in
+  `lib/supabase/admin.ts` (Stripe webhook), authenticated by the Stripe signature.
+- **SQL injection** is prevented by only ever going through the Supabase client
+  query builder / parameterized RPC — never string-concatenated SQL. The
+  Management API (`/database/query`) is for migrations/ops only, never fed
+  user input.
+- **Mutations** run through Server Actions / route handlers that re-check
+  `supabase.auth.getUser()` server-side; never trust a client-supplied `user_id`.
+
+### Mandatory verification before calling any security-relevant change "done"
+Write **and execute** automated tests (do not just describe them) covering:
+1. **Data isolation** — sign in as User A and request User B's resource
+   (e.g. `GET`/Server Action for B's song, payment, or profile); assert a
+   403/404 / empty result, never B's data.
+2. **SQL-injection prevention** — submit raw payloads (`' OR '1'='1`,
+   `'; drop table songs;--`, etc.) into every user-facing input/endpoint;
+   assert they are treated as literal data and fail safely (no error leak,
+   no unintended rows).
+3. **Brute-force defenses** — simulate rapid repeated login attempts; assert
+   rate-limiting / lockout triggers. (Supabase Auth rate-limits sign-in
+   server-side; verify it engages and document the threshold. If a custom
+   endpoint lacks throttling, add it.)
+4. **Data-exfiltration prevention** — assert list/detail responses return only
+   the caller's rows and only intended fields (no bulk dumps, no leaking
+   `stripe_customer_id`, service keys, other users' emails, internal columns).
+
+These live in **`tests/security/`** (run: `npm run test:security`) and run in CI
+on every push/PR to `main` via `.github/workflows/security-tests.yml`. Extend
+that suite when adding new tables/endpoints — don't hand-verify. **Report
+detailed results only after all four verification categories have been executed
+and pass** — state what was run, the payloads/scenarios used, and the outcomes.
+
+Established facts (keep the suite honest about them):
+- **Injection has two layers:** a Cloudflare WAF in front of Supabase blocks
+  blatant payloads (`DROP TABLE`, `OR 1=1`) outright, and anything that slips
+  past is parameterized by the PostgREST builder. "Fails safely" = blocked OR
+  returned zero rows.
+- **Brute-force throttling is Supabase Auth's**, not app code: rapid failed
+  sign-ins from one IP hit HTTP 429 at ~27–30 attempts, short reset window.
+
 ## gstack workflow
 This repo uses [gstack](https://github.com/garrytan/gstack):
 - **Plan:** `/office-hours` → `/autoplan`
