@@ -45,13 +45,13 @@ export default async function Home() {
         className="pointer-events-none absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-sage/30 blur-3xl"
       />
 
-      <div className="relative max-w-5xl mx-auto px-8 py-14 space-y-16">
+      <div className="relative max-w-5xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-16">
         <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div className="space-y-4">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 text-gold px-3 py-1 text-xs font-semibold tracking-wide uppercase">
               ✦ For musicians, poets & every kind of creator
             </span>
-            <h1 className="font-display text-5xl sm:text-6xl leading-[1.05] tracking-tight text-ink">
+            <h1 className="font-display text-4xl sm:text-6xl leading-[1.05] tracking-tight text-ink">
               Turn a song into{" "}
               <span className="italic text-mauve">scroll-stopping</span>{" "}
               clips

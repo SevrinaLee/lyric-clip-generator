@@ -45,7 +45,7 @@ export default async function AccountPage() {
         className="pointer-events-none absolute -top-24 -right-32 h-96 w-96 rounded-full bg-sky/30 blur-3xl"
       />
 
-      <div className="relative max-w-2xl mx-auto px-8 py-14 space-y-8">
+      <div className="relative max-w-2xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-8">
         <Link href="/" className="text-sm text-ink/50 hover:text-ink">
           ← Back
         </Link>
@@ -87,13 +87,13 @@ export default async function AccountPage() {
               {payments.map((p) => (
                 <li
                   key={p.id}
-                  className="flex items-center justify-between rounded-xl bg-cream px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-xl bg-cream px-3 py-2"
                 >
-                  <span className="text-ink/70">
+                  <span className="min-w-0 truncate text-ink/70">
                     {songTitleById.get(p.song_id) ?? "Song"} ·{" "}
                     {p.plan === "subscription" ? "Subscription" : "Single export"}
                   </span>
-                  <span className="flex items-center gap-2">
+                  <span className="flex shrink-0 items-center gap-2">
                     <span className="text-ink/50">
                       S${(p.amount_cents / 100).toFixed(2)}
                     </span>

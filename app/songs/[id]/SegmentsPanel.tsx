@@ -141,7 +141,7 @@ function SegmentRow({
 
       {error && <p className="text-sm text-mauve">{error}</p>}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           onClick={handleExport}
           disabled={isPending || status === "rendering" || status === "done"}

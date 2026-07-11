@@ -14,23 +14,15 @@ function msToLabel(ms: number): string {
 export type EditableLine = Lyric & { isEstimated: boolean };
 
 export function EditableLyricsTable({ lyrics }: { lyrics: EditableLine[] }) {
+  // Reflowing layout instead of a fixed 5-column table: on a phone the text
+  // input takes the first line and the start/end/delete controls wrap beneath
+  // it; on wider screens everything sits inline.
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-left text-xs text-ink/50">
-          <th className="font-normal pb-2 w-10">#</th>
-          <th className="font-normal pb-2">Text</th>
-          <th className="font-normal pb-2 w-20">Start (s)</th>
-          <th className="font-normal pb-2 w-20">End (s)</th>
-          <th className="font-normal pb-2 w-14"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {lyrics.map((line, index) => (
-          <LyricRow key={line.id} line={line} displayNumber={index + 1} />
-        ))}
-      </tbody>
-    </table>
+    <div className="text-sm">
+      {lyrics.map((line, index) => (
+        <LyricRow key={line.id} line={line} displayNumber={index + 1} />
+      ))}
+    </div>
   );
 }
 
@@ -83,66 +75,75 @@ function LyricRow({
 
   if (isDeleted) return null;
 
+  const timeInput = (line.isEstimated && saved ? "text-ink/40 italic" : "text-ink");
+
   return (
-    <tr className="border-t border-ink/10">
-      <td className="py-1.5 text-ink/30 tabular-nums">{displayNumber}</td>
-      <td className="py-1.5 pr-2">
-        <input
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            markDirty();
-          }}
-          placeholder="(empty — delete this line?)"
-          className="w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm text-ink placeholder:text-ink/30 placeholder:italic"
-        />
-      </td>
-      <td className="py-1.5 pr-2">
-        <input
-          value={start}
-          onChange={(e) => {
-            setStart(e.target.value);
-            markDirty();
-          }}
-          inputMode="decimal"
-          title={line.isEstimated ? "Estimated — adjust by ear" : undefined}
-          className={`w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm tabular-nums ${line.isEstimated && saved ? "text-ink/40 italic" : "text-ink"}`}
-        />
-      </td>
-      <td className="py-1.5 pr-2">
-        <input
-          value={end}
-          onChange={(e) => {
-            setEnd(e.target.value);
-            markDirty();
-          }}
-          inputMode="decimal"
-          title={line.isEstimated ? "Estimated — adjust by ear" : undefined}
-          className={`w-full rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1 text-sm tabular-nums ${line.isEstimated && saved ? "text-ink/40 italic" : "text-ink"}`}
-        />
-      </td>
-      <td className="py-1.5">
-        <div className="flex items-center gap-2">
-          {!saved && (
-            <button
-              onClick={handleSave}
-              disabled={isPending}
-              className="text-xs font-semibold text-mauve hover:underline disabled:opacity-50"
-            >
-              {isPending ? "…" : "Save"}
-            </button>
-          )}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-ink/10 py-2">
+      <span className="w-4 shrink-0 text-ink/30 tabular-nums text-xs">
+        {displayNumber}
+      </span>
+
+      <input
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          markDirty();
+        }}
+        placeholder="(empty — delete this line?)"
+        aria-label="Lyric text"
+        className="min-w-[150px] flex-1 rounded-lg border border-transparent hover:border-ink/15 focus:border-lavender focus:outline-none px-1.5 py-1.5 text-sm text-ink placeholder:text-ink/30 placeholder:italic"
+      />
+
+      <div className="ml-auto flex items-center gap-2">
+        <label className="flex items-center gap-1 text-[10px] text-ink/40">
+          <span>start</span>
+          <input
+            value={start}
+            onChange={(e) => {
+              setStart(e.target.value);
+              markDirty();
+            }}
+            inputMode="decimal"
+            aria-label="Start seconds"
+            title={line.isEstimated ? "Estimated — adjust by ear" : undefined}
+            className={`w-14 rounded-lg border border-ink/10 hover:border-ink/20 focus:border-lavender focus:outline-none px-1.5 py-1.5 text-sm tabular-nums ${timeInput}`}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-ink/40">
+          <span>end</span>
+          <input
+            value={end}
+            onChange={(e) => {
+              setEnd(e.target.value);
+              markDirty();
+            }}
+            inputMode="decimal"
+            aria-label="End seconds"
+            title={line.isEstimated ? "Estimated — adjust by ear" : undefined}
+            className={`w-14 rounded-lg border border-ink/10 hover:border-ink/20 focus:border-lavender focus:outline-none px-1.5 py-1.5 text-sm tabular-nums ${timeInput}`}
+          />
+        </label>
+
+        {!saved && (
           <button
-            onClick={handleDelete}
+            onClick={handleSave}
             disabled={isPending}
-            title="Delete line"
-            className="text-ink/30 hover:text-mauve disabled:opacity-50"
+            className="rounded-lg px-2 py-1.5 text-xs font-semibold text-mauve hover:bg-mauve/10 disabled:opacity-50"
           >
-            ✕
+            {isPending ? "…" : "Save"}
           </button>
-        </div>
-        {error && <p className="text-xs text-mauve">{error}</p>}
-      </td>
-    </tr>
+        )}
+        <button
+          onClick={handleDelete}
+          disabled={isPending}
+          aria-label="Delete line"
+          title="Delete line"
+          className="rounded-lg p-1.5 text-ink/30 hover:text-mauve hover:bg-mauve/10 disabled:opacity-50"
+        >
+          ✕
+        </button>
+      </div>
+      {error && <p className="w-full text-xs text-mauve">{error}</p>}
+    </div>
   );
 }

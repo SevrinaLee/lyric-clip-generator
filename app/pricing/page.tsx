@@ -27,7 +27,7 @@ export default function PricingPage() {
         className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-lavender/40 blur-3xl"
       />
 
-      <div className="relative max-w-3xl mx-auto px-8 py-14 space-y-10">
+      <div className="relative max-w-3xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-10">
         <div className="space-y-3 text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/20 text-gold px-3 py-1 text-xs font-semibold tracking-wide uppercase">
             ✦ Pricing

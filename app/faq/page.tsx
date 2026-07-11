@@ -55,7 +55,7 @@ export default function FaqPage() {
         className="pointer-events-none absolute -top-24 -right-32 h-96 w-96 rounded-full bg-rose/30 blur-3xl"
       />
 
-      <div className="relative max-w-2xl mx-auto px-8 py-14 space-y-10">
+      <div className="relative max-w-2xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-10">
         <div className="space-y-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-lavender/30 text-ink px-3 py-1 text-xs font-semibold tracking-wide uppercase">
             ✦ FAQ

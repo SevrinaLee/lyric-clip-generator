@@ -123,7 +123,7 @@ export default async function SongDetailPage({
         className="pointer-events-none absolute top-96 -left-24 h-72 w-72 rounded-full bg-sage/25 blur-3xl"
       />
 
-      <div className="relative max-w-2xl mx-auto px-8 py-14 space-y-8">
+      <div className="relative max-w-2xl mx-auto px-5 sm:px-8 py-10 sm:py-14 space-y-8">
         <Link href="/" className="text-sm text-ink/50 hover:text-ink">
           ← Back
         </Link>
