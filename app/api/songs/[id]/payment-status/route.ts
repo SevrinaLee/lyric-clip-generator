@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { evaluateSongAccess } from "@/lib/access";
 
 export async function GET(
   _req: Request,
@@ -7,13 +8,17 @@ export async function GET(
 ) {
   const { id } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data } = await supabase
-    .from("payments")
-    .select("id")
-    .eq("song_id", id)
-    .eq("status", "paid")
-    .limit(1);
+  const access = await evaluateSongAccess(user?.id ?? null, id);
 
-  return NextResponse.json({ paid: (data?.length ?? 0) > 0 });
+  // `paid` is kept for CheckoutStatusWatcher, which polls after a Stripe
+  // redirect and only wants to know when the actual payment lands.
+  return NextResponse.json({
+    unlocked: access.unlocked,
+    reason: access.reason,
+    paid: access.reason === "paid",
+  });
 }

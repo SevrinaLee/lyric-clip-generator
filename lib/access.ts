@@ -1,0 +1,107 @@
+// Server-only: pulls in the service-role admin client. Never import from a
+// Client Component.
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// Why a download is (or isn't) unlocked for a given user + song.
+//   founder        — comp account, everything free
+//   paid           — a paid payment exists for this song
+//   free-song      — this is the user's claimed free song
+//   free-eligible  — user hasn't claimed their one free song yet, so this
+//                    song CAN be downloaded free (claiming it on download)
+//   locked         — must pay
+export type AccessReason =
+  | "founder"
+  | "paid"
+  | "free-song"
+  | "free-eligible"
+  | "locked";
+
+export type SongAccess = { unlocked: boolean; reason: AccessReason };
+
+const LOCKED: SongAccess = { unlocked: false, reason: "locked" };
+
+type ProfileAccess = { is_founder: boolean; free_song_id: string | null };
+
+/**
+ * Read-only access evaluation (no side effects) — for pages and the
+ * payment-status endpoint. "free-eligible" is reported as unlocked because a
+ * download WILL succeed (and claim the freebie); the UI labels it as the
+ * user's one free song.
+ */
+export async function evaluateSongAccess(
+  userId: string | null,
+  songId: string,
+): Promise<SongAccess> {
+  if (!userId) return LOCKED;
+
+  const supabase = await createClient();
+  const [{ data: profile }, { data: paid }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("is_founder, free_song_id")
+      .eq("id", userId)
+      .maybeSingle<ProfileAccess>(),
+    supabase
+      .from("payments")
+      .select("id")
+      .eq("song_id", songId)
+      .eq("status", "paid")
+      .limit(1),
+  ]);
+
+  if (profile?.is_founder) return { unlocked: true, reason: "founder" };
+  if ((paid?.length ?? 0) > 0) return { unlocked: true, reason: "paid" };
+  if (profile?.free_song_id === songId) return { unlocked: true, reason: "free-song" };
+  if (!profile?.free_song_id) return { unlocked: true, reason: "free-eligible" };
+  return LOCKED;
+}
+
+/**
+ * Authorize an actual download, CLAIMING the free song if this is the first
+ * one the user downloads. The claim is written with the service-role client
+ * (users can't write free_song_id themselves — migration 0008) and only if
+ * the slot is still empty, so it can't be rotated to unlock multiple songs.
+ * Returns true if the download may proceed.
+ */
+export async function authorizeDownload(
+  userId: string,
+  songId: string,
+): Promise<boolean> {
+  const access = await evaluateSongAccess(userId, songId);
+
+  if (
+    access.reason === "founder" ||
+    access.reason === "paid" ||
+    access.reason === "free-song"
+  ) {
+    return true;
+  }
+
+  if (access.reason === "free-eligible") {
+    const admin = createAdminClient();
+    // Ensure a row exists without clobbering an existing claim.
+    await admin
+      .from("profiles")
+      .upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
+    // Atomic claim: only sets free_song_id when it's still null.
+    const { data: claimed } = await admin
+      .from("profiles")
+      .update({ free_song_id: songId, updated_at: new Date().toISOString() })
+      .eq("id", userId)
+      .is("free_song_id", null)
+      .select("free_song_id");
+    if (claimed && claimed.length > 0) return true;
+
+    // Lost a race (another concurrent download claimed first): allow only if
+    // the winning claim happens to be this same song.
+    const { data: after } = await admin
+      .from("profiles")
+      .select("free_song_id")
+      .eq("id", userId)
+      .maybeSingle<{ free_song_id: string | null }>();
+    return after?.free_song_id === songId;
+  }
+
+  return false;
+}

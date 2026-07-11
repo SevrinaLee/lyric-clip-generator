@@ -12,6 +12,7 @@ import type { EditableLine } from "./EditableLyricsTable";
 import { LyricsEditPanel } from "./LyricsEditPanel";
 import { linesForSegment, timeLines } from "@/lib/scoring";
 import { googleFontsUrl } from "@/lib/fonts";
+import { evaluateSongAccess } from "@/lib/access";
 
 const PLATFORM_STYLES: Record<string, string> = {
   tiktok: "bg-mauve/15 text-mauve",
@@ -44,7 +45,7 @@ export default async function SongDetailPage({
     { data: segments },
     { data: templates },
     { data: exportRows },
-    { data: paidPayments },
+    access,
   ] = await Promise.all([
     supabase
       .from("lyrics")
@@ -64,17 +65,11 @@ export default async function SongDetailPage({
       .select("*")
       .order("created_at", { ascending: false })
       .returns<Export[]>(),
-    supabase
-      .from("payments")
-      .select("id")
-      .eq("song_id", id)
-      .eq("status", "paid")
-      .limit(1),
+    evaluateSongAccess(user?.id ?? null, id),
   ]);
 
   const hasLyrics = (lyrics?.length ?? 0) > 0;
   const hasSegments = (segments?.length ?? 0) > 0;
-  const hasPaid = (paidPayments?.length ?? 0) > 0;
 
   // For the owner's edit view: every line gets a start/end to show (real if
   // set, lib/scoring.ts's estimate otherwise), flagged so the UI can hint
@@ -215,7 +210,8 @@ export default async function SongDetailPage({
                 templates={templates ?? []}
                 linesBySegment={linesBySegment}
                 exportsBySegment={exportsBySegment}
-                hasPaid={hasPaid}
+                unlocked={access.unlocked}
+                accessReason={access.reason}
               />
             )}
 

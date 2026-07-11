@@ -71,6 +71,24 @@ create policy "Users see own purchases"
   on purchases for select using (auth.uid() = user_id);
 ```
 
+### Download access model (who can download an export for free)
+Centralized in `lib/access.ts` and enforced server-side in
+`/api/exports/[id]/download` (the UI mirrors it but never gates on its own).
+A song's clips are downloadable without paying when any of:
+- **Founder** — `profiles.is_founder = true` (comp/QA/staff): every song free.
+- **Paid** — a `payments` row for the song is `paid`.
+- **Free song** — the user's one free song (`profiles.free_song_id`), claimed by
+  the first song they download from. The claim is written by the service-role
+  client only if the slot is still empty, so it can't be rotated to unlock more.
+
+`is_founder` and `free_song_id` are **locked columns**: migration 0008 revokes
+table-level insert/update from `anon`/`authenticated` and re-grants only
+`id, display_name, updated_at`, so a user can never self-promote to founder or
+set their own free song. `tests/security/` guards both (§ DevSecOps). To comp an
+account: `update profiles set is_founder = true where id = (select id from
+auth.users where email = '…')` (service role / SQL editor), after that account
+has signed up.
+
 ### Local webhook testing
 ```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhooks

@@ -2,10 +2,17 @@
 
 import { useState, useTransition } from "react";
 import type { ClipSegment, Export, VideoTemplate } from "@/lib/types";
+import type { AccessReason } from "@/lib/access";
 import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
+
+const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
+  founder: "★ Founder access — free",
+  "free-song": "✓ Your free song",
+  "free-eligible": "✓ Free — uses your one free song",
+};
 
 const PLATFORM_ACCENT: Record<string, string> = {
   tiktok: "bg-mauve",
@@ -22,7 +29,8 @@ export function SegmentsPanel({
   templates,
   linesBySegment,
   exportsBySegment,
-  hasPaid,
+  unlocked,
+  accessReason,
 }: {
   songId: string;
   audioUrl: string | null;
@@ -30,7 +38,8 @@ export function SegmentsPanel({
   templates: VideoTemplate[];
   linesBySegment: Map<string, PreviewLine[]>;
   exportsBySegment: Map<string, Export>;
-  hasPaid: boolean;
+  unlocked: boolean;
+  accessReason: AccessReason;
 }) {
   return (
     <ul className="space-y-4">
@@ -43,7 +52,8 @@ export function SegmentsPanel({
           templates={templates}
           lines={linesBySegment.get(segment.id) ?? []}
           latestExport={exportsBySegment.get(segment.id)}
-          hasPaid={hasPaid}
+          unlocked={unlocked}
+          accessReason={accessReason}
         />
       ))}
     </ul>
@@ -57,7 +67,8 @@ function SegmentRow({
   templates,
   lines,
   latestExport,
-  hasPaid,
+  unlocked,
+  accessReason,
 }: {
   songId: string;
   audioUrl: string | null;
@@ -65,7 +76,8 @@ function SegmentRow({
   templates: VideoTemplate[];
   lines: PreviewLine[];
   latestExport?: Export;
-  hasPaid: boolean;
+  unlocked: boolean;
+  accessReason: AccessReason;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -142,20 +154,27 @@ function SegmentRow({
               : "Export"}
         </button>
 
-        {status === "done" && exportId && hasPaid && (
-          <a
-            href={`/api/exports/${exportId}/download`}
-            className="text-sm font-semibold text-mauve hover:underline"
-          >
-            Download
-          </a>
+        {status === "done" && exportId && unlocked && (
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/exports/${exportId}/download`}
+              className="text-sm font-semibold text-mauve hover:underline"
+            >
+              Download
+            </a>
+            {UNLOCK_LABEL[accessReason] && (
+              <span className="text-xs text-ink/45">
+                {UNLOCK_LABEL[accessReason]}
+              </span>
+            )}
+          </div>
         )}
         {status === "failed" && (
           <span className="text-sm text-mauve">Export failed — try again</span>
         )}
       </div>
 
-      {status === "done" && !hasPaid && <PaymentGate songId={songId} />}
+      {status === "done" && !unlocked && <PaymentGate songId={songId} />}
     </li>
   );
 }

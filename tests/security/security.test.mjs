@@ -332,6 +332,45 @@ describe("4. Data-exfiltration prevention (no bulk or unintended leakage)", () =
   });
 });
 
+// ── 5. PRIVILEGE-ESCALATION PREVENTION ──────────────────────────────────────
+// The founder flag and the free-song claim are enforced by locking those
+// profile columns (migration 0008) so only the service-role client can write
+// them. A user must not be able to self-promote or rotate their free song.
+describe("5. Privilege-escalation prevention (locked profile columns)", () => {
+  it("a user cannot self-promote to founder", async () => {
+    // Ensure the profile row exists (setup created it via admin upsert).
+    await ctx.a.client
+      .from("profiles")
+      .update({ is_founder: true })
+      .eq("id", ctx.a.user.id)
+      .select();
+    const { data } = await admin
+      .from("profiles")
+      .select("is_founder")
+      .eq("id", ctx.a.user.id)
+      .single();
+    assert.equal(data.is_founder, false, "is_founder must remain false");
+  });
+
+  it("a user cannot set or rotate their free_song_id", async () => {
+    await ctx.a.client
+      .from("profiles")
+      .update({ free_song_id: ctx.a.songId })
+      .eq("id", ctx.a.user.id)
+      .select();
+    const { data } = await admin
+      .from("profiles")
+      .select("free_song_id")
+      .eq("id", ctx.a.user.id)
+      .single();
+    assert.equal(
+      data.free_song_id,
+      null,
+      "free_song_id must stay null — only server-trusted code may set it",
+    );
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {
