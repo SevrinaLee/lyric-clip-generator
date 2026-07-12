@@ -8,7 +8,8 @@ export type IconName =
   | "user"
   | "logout"
   | "menu"
-  | "close";
+  | "close"
+  | "film";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
@@ -46,6 +47,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   menu: <path d="M3 6h18M3 12h18M3 18h18" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  film: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+    </>
+  ),
 };
 
 export function Icon({

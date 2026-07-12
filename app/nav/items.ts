@@ -11,6 +11,7 @@ export type NavItem = {
 export const primaryItems: NavItem[] = [
   { href: "/songs/new", label: "New song", icon: "plus", primary: true },
   { href: "/songs", label: "My songs", icon: "music" },
+  { href: "/clips", label: "My clips", icon: "film" },
   { href: "/pricing", label: "Pricing", icon: "tag" },
   { href: "/faq", label: "FAQ", icon: "help" },
 ];
