@@ -181,7 +181,11 @@ export async function generateClips(songId: string) {
     throw new Error("Couldn't score clips — try adding more lyrics");
   }
 
-  const templateList = templates ?? [];
+  // Default new clips to free (non-premium) templates so a free user always
+  // starts with something they can actually export; premium ones are opt-in
+  // after unlocking the song.
+  const freeTemplates = (templates ?? []).filter((t) => !t.is_premium);
+  const templateList = freeTemplates.length > 0 ? freeTemplates : (templates ?? []);
   const rows = segments.map((seg, i) => ({
     song_id: songId,
     user_id: user.id,
@@ -206,11 +210,31 @@ export async function generateClips(songId: string) {
 
 export async function selectTemplate(segmentId: string, templateId: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
   const { data: segment } = await supabase
     .from("clip_segments")
     .select("song_id")
     .eq("id", segmentId)
     .maybeSingle<{ song_id: string }>();
+  if (!segment) throw new Error("Clip segment not found");
+
+  // Premium templates require paid access to the song — enforce server-side,
+  // not just in the picker UI.
+  const { data: template } = await supabase
+    .from("video_templates")
+    .select("is_premium")
+    .eq("id", templateId)
+    .maybeSingle<{ is_premium: boolean }>();
+  if (template?.is_premium) {
+    const access = await evaluateSongAccess(user.id, segment.song_id);
+    if (exportTier(access.reason).label !== "paid") {
+      throw new Error("Premium template — unlock this song to use it.");
+    }
+  }
 
   const { error } = await supabase
     .from("clip_segments")
@@ -218,7 +242,7 @@ export async function selectTemplate(segmentId: string, templateId: string) {
     .eq("id", segmentId);
 
   if (error) throw new Error(`Could not update template: ${error.message}`);
-  if (segment) revalidatePath(`/songs/${segment.song_id}`);
+  revalidatePath(`/songs/${segment.song_id}`);
 }
 
 export async function queueExport(segmentId: string) {

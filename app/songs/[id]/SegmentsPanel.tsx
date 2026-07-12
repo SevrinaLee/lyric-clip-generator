@@ -137,6 +137,7 @@ function SegmentRow({
         segmentId={segment.id}
         templates={templates}
         selectedId={selectedTemplateId}
+        paidTier={accessReason === "founder" || accessReason === "paid"}
         onSelect={setSelectedTemplateId}
       />
 

@@ -28,6 +28,7 @@ export type VideoTemplate = {
   primary_color: string;
   animation_preset: "fade" | "bounce" | "typewriter";
   background_style: string;
+  is_premium: boolean;
   created_at: string;
 };
 
