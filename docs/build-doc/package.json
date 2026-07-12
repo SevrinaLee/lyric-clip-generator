@@ -1,0 +1,11 @@
+{
+  "name": "build-doc-generator",
+  "private": true,
+  "type": "module",
+  "description": "Single-source generator for the build documentation (PDF + Markdown).",
+  "scripts": { "build": "node generate.mjs" },
+  "dependencies": {
+    "pdfkit": "^0.15.0",
+    "svg-to-pdfkit": "^0.1.8"
+  }
+}
