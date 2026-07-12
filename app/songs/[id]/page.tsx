@@ -205,6 +205,8 @@ export default async function SongDetailPage({
             {hasSegments && isOwner && (
               <SegmentsPanel
                 songId={song.id}
+                songTitle={song.title}
+                songArtist={song.artist}
                 audioUrl={song.audio_url}
                 segments={segments!}
                 templates={templates ?? []}

@@ -7,6 +7,7 @@ import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
+import { SharePanel } from "./SharePanel";
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
@@ -24,6 +25,8 @@ type PreviewLine = { text: string; offsetSeconds: number };
 
 export function SegmentsPanel({
   songId,
+  songTitle,
+  songArtist,
   audioUrl,
   segments,
   templates,
@@ -33,6 +36,8 @@ export function SegmentsPanel({
   accessReason,
 }: {
   songId: string;
+  songTitle: string;
+  songArtist: string;
   audioUrl: string | null;
   segments: ClipSegment[];
   templates: VideoTemplate[];
@@ -47,6 +52,8 @@ export function SegmentsPanel({
         <SegmentRow
           key={segment.id}
           songId={songId}
+          songTitle={songTitle}
+          songArtist={songArtist}
           audioUrl={audioUrl}
           segment={segment}
           templates={templates}
@@ -62,6 +69,8 @@ export function SegmentsPanel({
 
 function SegmentRow({
   songId,
+  songTitle,
+  songArtist,
   audioUrl,
   segment,
   templates,
@@ -71,6 +80,8 @@ function SegmentRow({
   accessReason,
 }: {
   songId: string;
+  songTitle: string;
+  songArtist: string;
   audioUrl: string | null;
   segment: ClipSegment;
   templates: VideoTemplate[];
@@ -175,6 +186,15 @@ function SegmentRow({
       </div>
 
       {status === "done" && !unlocked && <PaymentGate songId={songId} />}
+
+      {status === "done" && (
+        <SharePanel
+          title={songTitle}
+          artist={songArtist}
+          platform={segment.platform}
+          hookLine={lines[0]?.text}
+        />
+      )}
     </li>
   );
 }
