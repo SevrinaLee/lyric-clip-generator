@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { authorizeDownload } from "@/lib/access";
+import {
+  authorizeDownload,
+  evaluateSongAccess,
+  exportTier,
+} from "@/lib/access";
+import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
+import type { ClipSegment } from "@/lib/types";
+
+// Re-rendering a clean HD version on the first paid download can exceed the
+// 10s default.
+export const maxDuration = 60;
 
 export async function GET(
   _req: Request,
@@ -20,30 +30,29 @@ export async function GET(
   // demo). maybeSingle returns null for someone else's export → 404.
   const { data: exportRow } = await supabase
     .from("exports")
-    .select("status, video_url, clip_segment_id")
+    .select("status, video_url, clip_segment_id, tier")
     .eq("id", id)
     .maybeSingle<{
       status: string;
       video_url: string | null;
       clip_segment_id: string;
+      tier: string | null;
     }>();
 
   if (!exportRow || exportRow.status !== "done" || !exportRow.video_url) {
-    return NextResponse.json(
-      { error: "Export not ready" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Export not ready" }, { status: 404 });
   }
 
   // Defense in depth — the UI already hides the Download link unless the song
-  // is unlocked, but the route itself must enforce (and claim) it too. This
-  // is where a founder / first-free-song / paid check happens, and where the
-  // user's one free song gets claimed on their first download.
+  // is unlocked, but the route itself must enforce (and claim) it too: founder
+  // / first-free-song / paid check, plus the free-song claim on first download.
   const { data: segment } = await supabase
     .from("clip_segments")
-    .select("song_id")
+    .select("*")
     .eq("id", exportRow.clip_segment_id)
-    .maybeSingle<{ song_id: string }>();
+    .maybeSingle<ClipSegment>();
+
+  let videoPath = exportRow.video_url;
 
   if (segment) {
     const allowed = await authorizeDownload(user.id, segment.song_id);
@@ -53,11 +62,34 @@ export async function GET(
         { status: 402 },
       );
     }
+
+    // Value ladder: if the stored file is the free (watermarked) tier but the
+    // caller now has paid access, render a clean HD version once and cache it.
+    const desired = exportTier((await evaluateSongAccess(user.id, segment.song_id)).reason);
+    if (desired.label === "paid" && (exportRow.tier ?? "free") !== "paid") {
+      try {
+        const buffer = await renderSegmentToBuffer(supabase, segment, desired);
+        const hdPath = exportStoragePath(id, desired);
+        const { error: upErr } = await supabase.storage
+          .from("exports")
+          .upload(hdPath, buffer, { contentType: "video/mp4", upsert: true });
+        if (!upErr) {
+          await supabase
+            .from("exports")
+            .update({ video_url: hdPath, tier: "paid" })
+            .eq("id", id);
+          videoPath = hdPath;
+        }
+      } catch {
+        // If the HD re-render fails, fall back to serving the existing file
+        // rather than blocking the download the user paid for.
+      }
+    }
   }
 
   const { data, error } = await supabase.storage
     .from("exports")
-    .createSignedUrl(exportRow.video_url, 60 * 60);
+    .createSignedUrl(videoPath, 60 * 60);
 
   if (error || !data) {
     return NextResponse.json(

@@ -21,6 +21,24 @@ export type SongAccess = { unlocked: boolean; reason: AccessReason };
 
 const LOCKED: SongAccess = { unlocked: false, reason: "locked" };
 
+// Render tier by access. Paid access (founder or a paid payment) gets a clean,
+// full-resolution export; every free/unpaid download is watermarked and
+// rendered smaller. This is both the value ladder and the growth engine —
+// free clips carry the brand.
+export type ExportTier = {
+  label: "free" | "paid";
+  watermark: boolean;
+  width: number;
+  height: number;
+};
+
+export function exportTier(reason: AccessReason): ExportTier {
+  const paid = reason === "founder" || reason === "paid";
+  return paid
+    ? { label: "paid", watermark: false, width: 1080, height: 1920 }
+    : { label: "free", watermark: true, width: 720, height: 1280 };
+}
+
 type ProfileAccess = { is_founder: boolean; free_song_id: string | null };
 
 /**

@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { generateSegments, linesForSegment } from "@/lib/scoring";
-import { renderClip } from "@/lib/render";
+import { generateSegments } from "@/lib/scoring";
+import { evaluateSongAccess, exportTier } from "@/lib/access";
+import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
 import { transcribeAudio } from "@/lib/whisper";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
 
@@ -235,28 +236,11 @@ export async function queueExport(segmentId: string) {
   if (!segment) throw new Error("Clip segment not found");
   if (!segment.template_id) throw new Error("Pick a template first");
 
-  const [{ data: song }, { data: template }, { data: lyrics }] =
-    await Promise.all([
-      supabase
-        .from("songs")
-        .select("*")
-        .eq("id", segment.song_id)
-        .maybeSingle<Song>(),
-      supabase
-        .from("video_templates")
-        .select("*")
-        .eq("id", segment.template_id)
-        .maybeSingle<VideoTemplate>(),
-      supabase
-        .from("lyrics")
-        .select("*")
-        .eq("song_id", segment.song_id)
-        .order("line_index", { ascending: true })
-        .returns<Lyric[]>(),
-    ]);
-
-  if (!song?.audio_url) throw new Error("Song has no audio to render from");
-  if (!template) throw new Error("Template not found");
+  // Render at the exporter's current tier: paid (founder or a paid song) gets
+  // a clean HD clip; everyone else gets the watermarked, smaller free tier. A
+  // later paid download re-renders a clean version (see the download route).
+  const access = await evaluateSongAccess(user.id, segment.song_id);
+  const tier = exportTier(access.reason);
 
   const { data: exportRow, error: insertError } = await supabase
     .from("exports")
@@ -275,27 +259,17 @@ export async function queueExport(segmentId: string) {
   revalidatePath(`/songs/${segment.song_id}`);
 
   try {
-    const renderLines = linesForSegment(lyrics ?? [], song.duration_seconds, segment);
+    const videoBuffer = await renderSegmentToBuffer(supabase, segment, tier);
 
-    const videoBuffer = await renderClip({
-      audioUrl: song.audio_url,
-      startMs: segment.start_ms,
-      endMs: segment.end_ms,
-      lines: renderLines,
-      primaryColor: template.primary_color,
-      animationPreset: template.animation_preset,
-      backgroundStyle: template.background_style,
-    });
-
-    const path = `${exportRow.id}.mp4`;
+    const path = exportStoragePath(exportRow.id, tier);
     const { error: uploadError } = await supabase.storage
       .from("exports")
-      .upload(path, videoBuffer, { contentType: "video/mp4" });
+      .upload(path, videoBuffer, { contentType: "video/mp4", upsert: true });
     if (uploadError) throw new Error(uploadError.message);
 
     await supabase
       .from("exports")
-      .update({ status: "done", video_url: path })
+      .update({ status: "done", video_url: path, tier: tier.label })
       .eq("id", exportRow.id);
 
     return { id: exportRow.id as string };
