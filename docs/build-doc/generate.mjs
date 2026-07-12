@@ -21,7 +21,8 @@ const META = {
   subtitle: "How this app was built",
   tagline:
     "A build-and-decisions log of the work that took this app from an empty repo to a live, paying product — written for the whole team.",
-  version: "Version 1.0 — MVP complete",
+  version: "Version 1.1 — post-launch expansion",
+  versionShort: "v1.1",
   repo: "github.com/SevrinaLee/lyric-clip-generator",
   live: "lyric-clip-generator.vercel.app",
   date: "12 July 2026",
@@ -42,7 +43,9 @@ const SPINE = [
   { k: "access", lines: ["Access check"], name: "Access check (founder / free / paid)" },
   { k: "pay", lines: ["Pay to unlock"], name: "Pay to unlock (card / PayNow / GrabPay)" },
   { k: "download", lines: ["Download MP4"], name: "Download MP4" },
+  { k: "share", lines: ["Share +", "caption"], name: "Share + caption" },
   { k: "account", lines: ["Account"], name: "Account" },
+  { k: "myclips", lines: ["My clips"], name: "My clips (library)" },
 ];
 const FOUND = [
   { k: "navshell", lines: ["Nav shell"], name: "Nav shell" },
@@ -58,6 +61,7 @@ const M3 = { ...M2, account: "live" };
 const M4 = { ...M3, access: "live", security: "live" };
 const M5 = { ...M4, mysongs: "live", navshell: "live", mobile: "device" };
 const M6 = { ...M5, pay: "live", payinfra: "live" };
+const M7 = { ...M6, share: "live", myclips: "live" };
 
 // helpers to build the block list
 const h1 = (text) => ({ type: "h1", text });
@@ -92,6 +96,11 @@ const commits = [
   ["2026-07-11", "Responsive nav shell + My songs page (Phase 1)"],
   ["2026-07-11", "Mobile optimisation pass (Phase 2)"],
   ["2026-07-12", "Connect and verify live Stripe payments (v1.0)"],
+  ["2026-07-12", "Build documentation (PDF + Markdown) from a single-source generator"],
+  ["2026-07-12", "My clips history page (retention)"],
+  ["2026-07-12", "Share + caption helpers (distribution)"],
+  ["2026-07-12", "Watermark + resolution value ladder (monetization)"],
+  ["2026-07-12", "Premium templates gated to paid access"],
 ];
 
 const BLOCKS = [
@@ -165,10 +174,20 @@ const BLOCKS = [
   para("The final step to a true 1.0: connecting a live Singapore Stripe account. The secret key and webhook were configured, and the whole payment path was verified end to end without spending real money — the live key was confirmed valid and in live mode, a real checkout session was created and shown to offer card, GrabPay, PayNow and Link, and the webhook was proven to accept correctly-signed events and reject forged ones."),
   journey(M6, "Journey at v1.0: every step of the core loop is live, including real multi-method payments. Only the on-device mobile spot-check remains as blue."),
 
-  h1("3.  Where the app stands today (v1.0)"),
-  para("Every step of the core user journey works in live production: a real person can discover the app, sign up, upload audio, generate and preview clips, pay by card / PayNow / GrabPay, and download a finished MP4. That is the definition of a shippable 1.0."),
+  h2("Phase 7 - Expanding the journey (post-1.0)"),
+  para("With a shippable 1.0 live, the next phase reshaped the journey from a one-and-done download into a loop, and sharpened the reasons to pay. Three additions, chosen from a brainstorm over the journey diagram itself:"),
+  bullets([
+    "Retention - a 'My clips' library listing every finished export across songs, so the app becomes somewhere users return to, not a single-use tool.",
+    "Distribution - a share panel offering a ready-to-post caption and platform hashtags (rule-based, no AI key), with copy and native share, carrying users past download toward actually posting.",
+    "Monetization - a value ladder: free exports are watermarked and 720p; paying removes the watermark, renders at full 1080p, and unlocks the premium (gradient) templates.",
+  ]),
+  callout("Key decision - the watermark is also the growth engine", ["Every free clip carries a small 'made with Lyric Clip Generator' mark, so shared free clips advertise the app. Because rendering happens before payment, the download route lazily re-renders a clean HD version on the first paid download - so paying genuinely removes the mark."]),
+  journey(M7, "Journey after Phase 7: Share + caption and the My clips library are live, and the pay step now drives a watermark / resolution / premium-template value ladder."),
+
+  h1("3.  Where the app stands today (v1.1)"),
+  para("Every step of the core user journey works in live production: a real person can discover the app, sign up, upload audio, generate and preview clips, pay by card / PayNow / GrabPay, and download a finished MP4 — and now re-find it in a clips library and get help sharing it. The paid tier is a clear value ladder (no watermark, full HD, premium templates)."),
   h2("Live and working"),
-  para("Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the account area, the navigation shell, and an automated security suite running on every change."),
+  para("Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the watermark / resolution / premium-template value ladder, the My clips library, share + caption helpers, the account area, the navigation shell, and an automated security suite running on every change."),
   h2("Small open items (not blockers)"),
   bullets([
     "Auto-transcribe needs an OpenAI key to switch on. It is the optional path; typing or pasting lyrics works fully without it.",
@@ -300,7 +319,7 @@ function renderPDF() {
   doc.fillColor(ACCENT).font(BOLD).fontSize(15).text(META.subtitle, ML, doc.y + 4, { width: CONTENT_W });
   doc.moveDown(1.2);
   doc.font(FONT).fontSize(11).fillColor(MUTED).text(META.tagline, ML, doc.y, { width: CONTENT_W - 60, lineGap: 3 });
-  doc.roundedRect(ML, 470, 170, 30, 6).fill("#e6f4ea");
+  doc.roundedRect(ML, 470, 260, 30, 6).fill("#e6f4ea");
   doc.font(BOLD).fontSize(12).fillColor("#1e4d33").text(META.version, ML + 12, 479);
   doc.font(FONT).fontSize(10).fillColor(MUTED);
   doc.text(`Repository:  ${META.repo}`, ML, 720);
@@ -355,7 +374,7 @@ function renderPDF() {
     if (i === range.start) continue;
     doc.switchToPage(i);
     const saved = doc.page.margins.bottom; doc.page.margins.bottom = 0;
-    doc.font(FONT).fontSize(8).fillColor(FAINT).text(`Lyric Clip Generator  -  build documentation  -  v1.0`, ML, PAGE_H - 38, { width: CONTENT_W, align: "left", lineBreak: false });
+    doc.font(FONT).fontSize(8).fillColor(FAINT).text(`Lyric Clip Generator  -  build documentation  -  ${META.versionShort}`, ML, PAGE_H - 38, { width: CONTENT_W, align: "left", lineBreak: false });
     doc.text(`${i - range.start + 1}`, ML, PAGE_H - 38, { width: CONTENT_W, align: "right", lineBreak: false });
     doc.page.margins.bottom = saved;
   }

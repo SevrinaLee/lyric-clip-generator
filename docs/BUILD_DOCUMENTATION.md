@@ -2,7 +2,7 @@
 
 > A build-and-decisions log of the work that took this app from an empty repo to a live, paying product — written for the whole team.
 
-**Version 1.0 — MVP complete**
+**Version 1.1 — post-launch expansion**
 
 - Repository: github.com/SevrinaLee/lyric-clip-generator
 - Live: lyric-clip-generator.vercel.app
@@ -68,7 +68,9 @@ The first push built the entire spine of the product from an empty repository, f
 | Access check (founder / free / paid) | ⚪ Not built yet |
 | Pay to unlock (card / PayNow / GrabPay) | 🟡 Built, needs config |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | ⚪ Not built yet |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | ⚪ Not built yet |
 | _Mobile layout (foundation)_ | ⚪ Not built yet |
 | _Security + RLS (foundation)_ | 🟡 Built, needs config |
@@ -105,7 +107,9 @@ A working demo on a laptop is not a working product. Several things that passed 
 | Access check (founder / free / paid) | ⚪ Not built yet |
 | Pay to unlock (card / PayNow / GrabPay) | 🟡 Built, needs config |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | ⚪ Not built yet |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | ⚪ Not built yet |
 | _Mobile layout (foundation)_ | ⚪ Not built yet |
 | _Security + RLS (foundation)_ | 🟡 Built, needs config |
@@ -135,7 +139,9 @@ With the core solid, the next phase added the things a real product needs around
 | Access check (founder / free / paid) | ⚪ Not built yet |
 | Pay to unlock (card / PayNow / GrabPay) | 🟡 Built, needs config |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | 🟢 Live |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | ⚪ Not built yet |
 | _Mobile layout (foundation)_ | ⚪ Not built yet |
 | _Security + RLS (foundation)_ | 🟡 Built, needs config |
@@ -172,7 +178,9 @@ It also introduced a smarter download-access model: founder/QA accounts that get
 | Access check (founder / free / paid) | 🟢 Live |
 | Pay to unlock (card / PayNow / GrabPay) | 🟡 Built, needs config |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | 🟢 Live |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | ⚪ Not built yet |
 | _Mobile layout (foundation)_ | ⚪ Not built yet |
 | _Security + RLS (foundation)_ | 🟢 Live |
@@ -198,7 +206,9 @@ Until now the app had a single top bar. This phase turned it into a proper respo
 | Access check (founder / free / paid) | 🟢 Live |
 | Pay to unlock (card / PayNow / GrabPay) | 🟡 Built, needs config |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | 🟢 Live |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | 🟢 Live |
 | _Mobile layout (foundation)_ | 🔵 Verify on device |
 | _Security + RLS (foundation)_ | 🟢 Live |
@@ -224,7 +234,9 @@ The final step to a true 1.0: connecting a live Singapore Stripe account. The se
 | Access check (founder / free / paid) | 🟢 Live |
 | Pay to unlock (card / PayNow / GrabPay) | 🟢 Live |
 | Download MP4 | 🟢 Live |
+| Share + caption | ⚪ Not built yet |
 | Account | 🟢 Live |
+| My clips (library) | ⚪ Not built yet |
 | _Nav shell (foundation)_ | 🟢 Live |
 | _Mobile layout (foundation)_ | 🔵 Verify on device |
 | _Security + RLS (foundation)_ | 🟢 Live |
@@ -232,13 +244,49 @@ The final step to a true 1.0: connecting a live Singapore Stripe account. The se
 
 *Journey at v1.0: every step of the core loop is live, including real multi-method payments. Only the on-device mobile spot-check remains as blue.*
 
-## 3.  Where the app stands today (v1.0)
+### Phase 7 - Expanding the journey (post-1.0)
 
-Every step of the core user journey works in live production: a real person can discover the app, sign up, upload audio, generate and preview clips, pay by card / PayNow / GrabPay, and download a finished MP4. That is the definition of a shippable 1.0.
+With a shippable 1.0 live, the next phase reshaped the journey from a one-and-done download into a loop, and sharpened the reasons to pay. Three additions, chosen from a brainstorm over the journey diagram itself:
+
+- Retention - a 'My clips' library listing every finished export across songs, so the app becomes somewhere users return to, not a single-use tool.
+- Distribution - a share panel offering a ready-to-post caption and platform hashtags (rule-based, no AI key), with copy and native share, carrying users past download toward actually posting.
+- Monetization - a value ladder: free exports are watermarked and 720p; paying removes the watermark, renders at full 1080p, and unlocks the premium (gradient) templates.
+
+> **Key decision - the watermark is also the growth engine**
+>
+> Every free clip carries a small 'made with Lyric Clip Generator' mark, so shared free clips advertise the app. Because rendering happens before payment, the download route lazily re-renders a clean HD version on the first paid download - so paying genuinely removes the mark.
+
+| Journey step | Status |
+| --- | --- |
+| Discover (landing / pricing / FAQ) | 🟢 Live |
+| Sign up / log in | 🟢 Live |
+| My songs | 🟢 Live |
+| Upload song | 🟢 Live |
+| Add lyrics | 🟢 Live |
+| Edit timing | 🟢 Live |
+| Generate clips | 🟢 Live |
+| Template + preview | 🟢 Live |
+| Export MP4 | 🟢 Live |
+| Access check (founder / free / paid) | 🟢 Live |
+| Pay to unlock (card / PayNow / GrabPay) | 🟢 Live |
+| Download MP4 | 🟢 Live |
+| Share + caption | 🟢 Live |
+| Account | 🟢 Live |
+| My clips (library) | 🟢 Live |
+| _Nav shell (foundation)_ | 🟢 Live |
+| _Mobile layout (foundation)_ | 🔵 Verify on device |
+| _Security + RLS (foundation)_ | 🟢 Live |
+| _Payments infra (foundation)_ | 🟢 Live |
+
+*Journey after Phase 7: Share + caption and the My clips library are live, and the pay step now drives a watermark / resolution / premium-template value ladder.*
+
+## 3.  Where the app stands today (v1.1)
+
+Every step of the core user journey works in live production: a real person can discover the app, sign up, upload audio, generate and preview clips, pay by card / PayNow / GrabPay, and download a finished MP4 — and now re-find it in a clips library and get help sharing it. The paid tier is a clear value ladder (no watermark, full HD, premium templates).
 
 ### Live and working
 
-Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the account area, the navigation shell, and an automated security suite running on every change.
+Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the watermark / resolution / premium-template value ladder, the My clips library, share + caption helpers, the account area, the navigation shell, and an automated security suite running on every change.
 
 ### Small open items (not blockers)
 
@@ -280,6 +328,11 @@ Every commit, oldest to newest. Read top-to-bottom, this is the same story as Se
 | 2026-07-11 | Responsive nav shell + My songs page (Phase 1) |
 | 2026-07-11 | Mobile optimisation pass (Phase 2) |
 | 2026-07-12 | Connect and verify live Stripe payments (v1.0) |
+| 2026-07-12 | Build documentation (PDF + Markdown) from a single-source generator |
+| 2026-07-12 | My clips history page (retention) |
+| 2026-07-12 | Share + caption helpers (distribution) |
+| 2026-07-12 | Watermark + resolution value ladder (monetization) |
+| 2026-07-12 | Premium templates gated to paid access |
 
 ## Appendix B.  Technical reference (for engineers)
 
