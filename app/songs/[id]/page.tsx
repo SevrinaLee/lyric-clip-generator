@@ -71,6 +71,15 @@ export default async function SongDetailPage({
   const hasLyrics = (lyrics?.length ?? 0) > 0;
   const hasSegments = (segments?.length ?? 0) > 0;
 
+  // Most recent lyric/timing edit for the song (falls back to created_at, and
+  // to null if the 0011 updated_at column isn't present yet). A rendered clip
+  // whose export predates this is stale — see SegmentsPanel.
+  const lyricsUpdatedAt =
+    (lyrics ?? [])
+      .map((l) => l.updated_at ?? l.created_at)
+      .sort()
+      .at(-1) ?? null;
+
   // For the owner's edit view: every line gets a start/end to show (real if
   // set, lib/scoring.ts's estimate otherwise), flagged so the UI can hint
   // which is which — matches the same estimate queueExport/the preview use.
@@ -212,6 +221,7 @@ export default async function SongDetailPage({
                 templates={templates ?? []}
                 linesBySegment={linesBySegment}
                 exportsBySegment={exportsBySegment}
+                lyricsUpdatedAt={lyricsUpdatedAt}
                 unlocked={access.unlocked}
                 accessReason={access.reason}
               />

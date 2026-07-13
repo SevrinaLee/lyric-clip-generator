@@ -18,6 +18,10 @@ export type Lyric = {
   start_ms: number | null;
   end_ms: number | null;
   created_at: string;
+  // Bumped by the timing-edit actions (see actions.ts). Used to tell when a
+  // rendered clip has gone stale relative to a later lyric edit. Optional so
+  // the app still type-checks/degrades if the 0011 column isn't present yet.
+  updated_at?: string;
 };
 
 export type VideoTemplate = {

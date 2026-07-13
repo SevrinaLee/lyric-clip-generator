@@ -92,7 +92,7 @@ export async function updateLyricTiming(
 
   const { error } = await supabase
     .from("lyrics")
-    .update(updates)
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", lyricId);
   if (error) throw new Error(`Could not update line: ${error.message}`);
 
@@ -114,10 +114,11 @@ export async function bulkUpdateLyricTimings(
     .eq("id", updates[0].id)
     .maybeSingle<{ song_id: string }>();
 
+  const now = new Date().toISOString();
   for (const u of updates) {
     const { error } = await supabase
       .from("lyrics")
-      .update({ start_ms: u.start_ms, end_ms: u.end_ms })
+      .update({ start_ms: u.start_ms, end_ms: u.end_ms, updated_at: now })
       .eq("id", u.id);
     if (error) throw new Error(`Could not save timing: ${error.message}`);
   }
