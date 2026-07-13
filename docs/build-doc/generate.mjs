@@ -182,6 +182,7 @@ const BLOCKS = [
     "Monetization - a value ladder: free exports are watermarked and 720p; paying removes the watermark, renders at full 1080p, and unlocks the premium (gradient) templates.",
   ]),
   callout("Key decision - the watermark is also the growth engine", ["Every free clip carries a small 'made with Lyric Clip Generator' mark, so shared free clips advertise the app. Because rendering happens before payment, the download route lazily re-renders a clean HD version on the first paid download - so paying genuinely removes the mark."]),
+  para("A later refinement closed a trust gap in this loop. A rendered clip is a baked file, so editing lyric timing afterwards left the download silently out of date. Each clip zone now shows a Refresh control that re-renders from the latest saved timing, and when timing changes after a render the zone auto-flags itself 'outdated' (comparing the song's most recent lyric edit to when the clip was rendered) while reassuring the user that the live preview is already current. The result is an explicit guarantee that the downloadable clip can always be brought in line with the latest timing."),
   journey(M7, "Journey after Phase 7: Share + caption and the My clips library are live, and the pay step now drives a watermark / resolution / premium-template value ladder."),
 
   h1("3.  Where the app stands today (v1.1)"),
