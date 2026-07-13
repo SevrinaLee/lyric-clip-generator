@@ -7,7 +7,9 @@ import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
+import { ClipStyleRow } from "./ClipStyleRow";
 import { SharePanel } from "./SharePanel";
+import { resolveClipStyle, type CaptionSize } from "@/lib/captionStyles";
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
@@ -107,8 +109,20 @@ function SegmentRow({
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     segment.template_id,
   );
+  // Per-clip caption overrides, kept in client state so the preview updates
+  // instantly; persisted through the updateClipStyle action by ClipStyleRow.
+  const [captionFont, setCaptionFont] = useState(segment.caption_font ?? null);
+  const [captionSize, setCaptionSize] = useState<CaptionSize | null>(
+    segment.caption_size ?? null,
+  );
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+  const clipStyle = selectedTemplate
+    ? resolveClipStyle(selectedTemplate, {
+        caption_font: captionFont,
+        caption_size: captionSize,
+      })
+    : null;
 
   // Staleness is DERIVED (not stored) so it re-evaluates whenever a timing
   // save revalidates the page and pushes a newer lyricsUpdatedAt — the badge
@@ -165,13 +179,26 @@ function SegmentRow({
         onSelect={setSelectedTemplateId}
       />
 
-      {selectedTemplate && audioUrl && lines.length > 0 && (
+      <ClipStyleRow
+        segmentId={segment.id}
+        templateFont={selectedTemplate?.font ?? "Noto Sans"}
+        initialFont={captionFont}
+        initialSize={captionSize}
+        paidTier={accessReason === "founder" || accessReason === "paid"}
+        onChange={(font, size) => {
+          setCaptionFont(font);
+          setCaptionSize(size);
+        }}
+      />
+
+      {selectedTemplate && clipStyle && audioUrl && lines.length > 0 && (
         <ClipPreviewPlayer
           audioUrl={audioUrl}
           startMs={segment.start_ms}
           endMs={segment.end_ms}
           lines={lines}
           template={selectedTemplate}
+          clipStyle={clipStyle}
         />
       )}
 

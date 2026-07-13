@@ -11,6 +11,9 @@ import { parseBackgroundStyle } from "./backgrounds";
 // instead of a real filesystem path, which crashes path.join at runtime.
 // process.cwd() is reliable in both dev and the serverless bundle.
 const FONTS_DIR = path.join(process.cwd(), "assets/fonts");
+// Watermark always renders in the vendored default regardless of the
+// caption's chosen font; captions use the family passed by the caller
+// (resolved via lib/captionStyles.ts from vendored TTFs in assets/fonts).
 const FONT_FAMILY = "Noto Sans";
 // Caption layout is authored in this fixed 1080x1920 design space (ass
 // PlayResX/Y); libass scales it to whatever output resolution we render at,
@@ -44,6 +47,8 @@ function buildAssSubtitle(
   durationSeconds: number,
   animationPreset: "fade" | "bounce" | "typewriter",
   watermark: boolean,
+  fontFamily: string,
+  fontSize: number,
 ): string {
   // Watermark style: bottom-centre (Alignment 2), small, ~60% opacity white
   // with a soft outline so it stays legible over any background.
@@ -55,7 +60,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${FONT_FAMILY},64,&H00FFFFFF,&H000000FF,&H00000000,&HA6000000,0,0,0,0,100,100,0,0,3,20,0,5,40,40,40,1
+Style: Default,${fontFamily},${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&HA6000000,0,0,0,0,100,100,0,0,3,20,0,5,40,40,40,1
 Style: Watermark,${FONT_FAMILY},34,&H50FFFFFF,&H000000FF,&H80000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,44,1
 
 [Events]
@@ -136,6 +141,8 @@ export async function renderClip({
   watermark = false,
   width = DESIGN_W,
   height = DESIGN_H,
+  fontFamily = FONT_FAMILY,
+  fontSize = 64,
 }: {
   audioUrl: string;
   startMs: number;
@@ -147,6 +154,10 @@ export async function renderClip({
   watermark?: boolean;
   width?: number;
   height?: number;
+  /** ASS family name of a vendored TTF (see lib/captionStyles.ts) */
+  fontFamily?: string;
+  /** Caption font size in the 1080x1920 design space */
+  fontSize?: number;
 }): Promise<Buffer> {
   if (!ffmpegPath) throw new Error("ffmpeg binary not found");
 
@@ -165,7 +176,14 @@ export async function renderClip({
 
     await writeFile(
       assPath,
-      buildAssSubtitle(lines, durationSeconds, animationPreset, watermark),
+      buildAssSubtitle(
+        lines,
+        durationSeconds,
+        animationPreset,
+        watermark,
+        fontFamily,
+        fontSize,
+      ),
     );
 
     const assFilterPath = escapeFilterPath(assPath);

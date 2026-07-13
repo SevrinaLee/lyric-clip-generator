@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { VideoTemplate } from "@/lib/types";
 import { cssBackground, parseBackgroundStyle } from "@/lib/backgrounds";
+import type { ResolvedClipStyle } from "@/lib/captionStyles";
 
 type PreviewLine = { text: string; offsetSeconds: number };
 
@@ -18,12 +19,16 @@ export function ClipPreviewPlayer({
   endMs,
   lines,
   template,
+  clipStyle,
 }: {
   audioUrl: string;
   startMs: number;
   endMs: number;
   lines: PreviewLine[];
   template: VideoTemplate;
+  /** Effective caption style (template + per-clip overrides), resolved by
+   *  lib/captionStyles.ts — the same object the export render consumes. */
+  clipStyle: ResolvedClipStyle;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -81,9 +86,11 @@ export function ClipPreviewPlayer({
               which keeps captions readable over any background visual. */}
           <span
             key={activeIndex}
-            className={`rounded bg-black/60 px-1.5 py-1 text-[11px] font-medium leading-tight text-white ${LINE_ANIMATION[template.animation_preset]}`}
+            className={`rounded bg-black/60 px-1.5 py-1 leading-tight text-white ${LINE_ANIMATION[template.animation_preset]}`}
             style={{
-              fontFamily: `"${template.font}", sans-serif`,
+              fontFamily: `"${clipStyle.font.cssFamily}", sans-serif`,
+              fontWeight: clipStyle.font.cssWeight,
+              fontSize: `${clipStyle.previewPx}px`,
             }}
           >
             {lines[activeIndex]?.text}

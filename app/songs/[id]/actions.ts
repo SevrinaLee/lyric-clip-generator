@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { generateSegments } from "@/lib/scoring";
 import { evaluateSongAccess, exportTier } from "@/lib/access";
 import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
+import { FONT_REGISTRY, SIZE_PRESETS } from "@/lib/captionStyles";
 import { transcribeAudio } from "@/lib/whisper";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
 
@@ -243,6 +244,61 @@ export async function selectTemplate(segmentId: string, templateId: string) {
     .eq("id", segmentId);
 
   if (error) throw new Error(`Could not update template: ${error.message}`);
+  revalidatePath(`/songs/${segment.song_id}`);
+}
+
+// Per-clip caption style overrides (null = revert to template default).
+// Values are validated against the registries and premium fonts are gated
+// server-side, mirroring selectTemplate — never trust the picker UI alone.
+export async function updateClipStyle(
+  segmentId: string,
+  updates: { caption_font?: string | null; caption_size?: string | null },
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  const { data: segment } = await supabase
+    .from("clip_segments")
+    .select("song_id")
+    .eq("id", segmentId)
+    .maybeSingle<{ song_id: string }>();
+  if (!segment) throw new Error("Clip segment not found");
+
+  const patch: { caption_font?: string | null; caption_size?: string | null } = {};
+
+  if ("caption_font" in updates) {
+    const font = updates.caption_font;
+    if (font !== null && font !== undefined) {
+      const def = FONT_REGISTRY[font];
+      if (!def) throw new Error("Unknown font");
+      if (def.isPremium) {
+        const access = await evaluateSongAccess(user.id, segment.song_id);
+        if (exportTier(access.reason).label !== "paid") {
+          throw new Error("Premium font — unlock this song to use it.");
+        }
+      }
+    }
+    patch.caption_font = font ?? null;
+  }
+
+  if ("caption_size" in updates) {
+    const size = updates.caption_size;
+    if (size !== null && size !== undefined && !(size in SIZE_PRESETS)) {
+      throw new Error("Unknown size");
+    }
+    patch.caption_size = size ?? null;
+  }
+
+  if (Object.keys(patch).length === 0) return;
+
+  const { error } = await supabase
+    .from("clip_segments")
+    .update(patch)
+    .eq("id", segmentId);
+  if (error) throw new Error(`Could not update style: ${error.message}`);
   revalidatePath(`/songs/${segment.song_id}`);
 }
 

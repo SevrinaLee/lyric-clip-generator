@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { linesForSegment } from "./scoring";
 import { renderClip } from "./render";
+import { resolveClipStyle } from "./captionStyles";
 import type { ExportTier } from "./access";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "./types";
 
@@ -34,6 +35,9 @@ export async function renderSegmentToBuffer(
   if (!template) throw new Error("Template not found");
 
   const renderLines = linesForSegment(lyrics ?? [], song.duration_seconds, segment);
+  // Template defaults + per-clip overrides → the same effective style the
+  // browser preview shows, so exports finally match the preview's font.
+  const style = resolveClipStyle(template, segment);
   return renderClip({
     audioUrl: song.audio_url,
     startMs: segment.start_ms,
@@ -45,6 +49,8 @@ export async function renderSegmentToBuffer(
     watermark: tier.watermark,
     width: tier.width,
     height: tier.height,
+    fontFamily: style.font.assFamily,
+    fontSize: style.assFontSize,
   });
 }
 

@@ -12,6 +12,7 @@ import type { EditableLine } from "./EditableLyricsTable";
 import { LyricsEditPanel } from "./LyricsEditPanel";
 import { linesForSegment, timeLines } from "@/lib/scoring";
 import { googleFontsUrl } from "@/lib/fonts";
+import { FONT_REGISTRY } from "@/lib/captionStyles";
 import { evaluateSongAccess } from "@/lib/access";
 
 const PLATFORM_STYLES: Record<string, string> = {
@@ -115,9 +116,14 @@ export default async function SongDetailPage({
     }
   }
 
+  // Load template fonts plus every registry font, so the per-clip font picker
+  // previews correctly no matter which override the user chooses.
   const fontsUrl =
     isOwner && hasSegments
-      ? googleFontsUrl((templates ?? []).map((t) => t.font))
+      ? googleFontsUrl([
+          ...(templates ?? []).map((t) => t.font),
+          ...Object.keys(FONT_REGISTRY),
+        ])
       : "";
 
   return (

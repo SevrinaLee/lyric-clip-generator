@@ -45,6 +45,11 @@ export type ClipSegment = {
   end_ms: number;
   platform: "tiktok" | "reels" | "shorts";
   template_id: string | null;
+  // Per-clip caption style overrides (migration 0012); null = inherit from
+  // template. Optional-tolerant like lyrics.updated_at so the app still
+  // type-checks/degrades before the column exists.
+  caption_font?: string | null;
+  caption_size?: "sm" | "md" | "lg" | null;
   hook_score: number | null;
   hook_score_source: string | null;
   hook_score_confidence: number | null;

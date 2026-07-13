@@ -371,6 +371,84 @@ describe("5. Privilege-escalation prevention (locked profile columns)", () => {
   });
 });
 
+// ── 6. PER-CLIP CAPTION STYLE (migration 0012) ─────────────────────────────
+// The caption_font/caption_size override columns are owner-writable by
+// design (RLS from 0004); what must hold is that OTHER users and anon can't
+// touch them, and the size CHECK constraint rejects junk at the DB layer.
+// (Premium-font gating lives in the updateClipStyle server action — enforced
+// against evaluateSongAccess — and is exercised by its registry validation;
+// the DB-level guarantees are what this suite owns.)
+describe("6. Per-clip caption style columns (0012)", () => {
+  let segmentId;
+
+  before(async () => {
+    const { data: seg, error } = await ctx.a.client
+      .from("clip_segments")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        label: "Hook",
+        start_ms: 0,
+        end_ms: 8000,
+        platform: "tiktok",
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A should insert own clip segment");
+    segmentId = seg.id;
+  });
+
+  it("positive control: A can set own caption style", async () => {
+    const { data, error } = await ctx.a.client
+      .from("clip_segments")
+      .update({ caption_font: "Montserrat ExtraBold", caption_size: "lg" })
+      .eq("id", segmentId)
+      .select("caption_font, caption_size");
+    assert.equal(error, null);
+    assert.equal(data?.[0]?.caption_font, "Montserrat ExtraBold");
+    assert.equal(data?.[0]?.caption_size, "lg");
+  });
+
+  it("B cannot modify A's caption style", async () => {
+    const { data } = await ctx.b.client
+      .from("clip_segments")
+      .update({ caption_font: "Anton", caption_size: "sm" })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "update must affect zero rows");
+
+    const { data: check } = await admin
+      .from("clip_segments")
+      .select("caption_font")
+      .eq("id", segmentId)
+      .single();
+    assert.equal(check.caption_font, "Montserrat ExtraBold", "unchanged");
+  });
+
+  it("anon cannot modify caption style", async () => {
+    const anon = anonClient(env);
+    const { data } = await anon
+      .from("clip_segments")
+      .update({ caption_size: "sm" })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "anon update must affect zero rows");
+  });
+
+  it("DB CHECK rejects junk caption_size even from the owner", async () => {
+    const { error } = await ctx.a.client
+      .from("clip_segments")
+      .update({ caption_size: "gigantic'; drop table songs;--" })
+      .eq("id", segmentId);
+    assert.ok(error, "junk size must be rejected by the check constraint");
+
+    const { count } = await admin
+      .from("songs")
+      .select("id", { count: "exact", head: true });
+    assert.ok((count ?? 0) > 0, "songs table must still exist");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {
