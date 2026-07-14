@@ -21,6 +21,35 @@
 ## Path aliases
 `@/*` → repo root
 
+## Clip rendering & caption styles
+Clips are rendered server-side with the bundled `ffmpeg-static` binary
+(`lib/render.ts`) — its Linux build has **no working `drawtext`**, so all
+caption text is burned in via libass `.ass` subtitles. Vendored TTFs live in
+`assets/fonts/` (referenced by ASS family name + `fontsdir`).
+
+- **`lib/captionStyles.ts` is the single source of truth** for caption style:
+  `FONT_REGISTRY`, size/position/style-preset tables, the word-pop timing, and
+  `resolveClipStyle(template, overrides)`. Both the ffmpeg render
+  (`lib/exportRender.ts` → `renderClip`) and the live CSS preview
+  (`ClipPreviewPlayer`) consume the **same** resolved object, so preview and
+  export stay in parity by construction. Add new fonts/presets here only.
+- **`lib/backgrounds.ts` is the single source of truth** for
+  `video_templates.background_style`. Grammar: `solid`,
+  `gradient:<c0>:<c1>`, `pulse:<c0>:<c1>` (animated gradient), and
+  `waveform:<base>:<accent>` (audio-reactive `showwaves` over a dark gradient).
+  `render.ts`'s `backgroundSource` realizes each as ffmpeg filtergraph pieces;
+  `cssBackground` gives the (approximate) preview. Extend the grammar in one
+  place so both sides agree.
+- **Per-clip overrides** live on `clip_segments` (`caption_font/size/position/
+  style_preset/animation`, migrations 0012–0013), NULL = inherit from the
+  template. Writes go through the `updateClipStyle` server action, which
+  validates every value against the registries and **gates premium options
+  server-side** (premium fonts, `outline-yellow`) via `evaluateSongAccess` —
+  never trust the picker UI alone. Extend `tests/security/` when adding columns.
+- Verify render changes by extracting frames: `npm run verify:captions`
+  (`scripts/verify-captions.ts`) renders each style/background combination for
+  visual inspection.
+
 ## Stripe payments
 
 ### Two modes — controlled by env vars only, no code changes

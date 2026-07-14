@@ -7,7 +7,7 @@ import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
-import { ClipStyleRow } from "./ClipStyleRow";
+import { ClipStylePanel } from "./ClipStylePanel";
 import { SharePanel } from "./SharePanel";
 import { resolveClipStyle, type ClipStyleOverrides } from "@/lib/captionStyles";
 
@@ -110,7 +110,7 @@ function SegmentRow({
     segment.template_id,
   );
   // Per-clip caption overrides, kept in client state so the preview updates
-  // instantly; persisted through the updateClipStyle action by ClipStyleRow.
+  // instantly; persisted through the updateClipStyle action by ClipStylePanel.
   const [overrides, setOverrides] = useState<ClipStyleOverrides>({
     caption_font: segment.caption_font ?? null,
     caption_size: segment.caption_size ?? null,
@@ -180,7 +180,7 @@ function SegmentRow({
       />
 
       {selectedTemplate && (
-        <ClipStyleRow
+        <ClipStylePanel
           segmentId={segment.id}
           template={selectedTemplate}
           initial={overrides}
