@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { linesForSegment } from "./scoring";
+import { linesForSegment, attachWordTiming } from "./scoring";
 import { renderClip } from "./render";
 import { resolveClipStyle } from "./captionStyles";
 import type { ExportTier } from "./access";
-import type { ClipSegment, Lyric, Song, VideoTemplate } from "./types";
+import type { ClipSegment, Lyric, LyricWord, Song, VideoTemplate } from "./types";
 
 // Gathers a segment's render inputs and produces the MP4 at the given tier.
 // Shared by queueExport (initial render) and the download route (lazy
@@ -34,7 +34,19 @@ export async function renderSegmentToBuffer(
   if (!song?.audio_url) throw new Error("Song has no audio to render from");
   if (!template) throw new Error("Template not found");
 
-  const renderLines = linesForSegment(lyrics ?? [], song.duration_seconds, segment);
+  // Attach per-word timing (lyric_words) so synced word-pop/karaoke render on
+  // the actual vocal; lyrics without words fall back to the even split.
+  const lyricIds = (lyrics ?? []).map((l) => l.id);
+  const { data: words } = lyricIds.length
+    ? await supabase
+        .from("lyric_words")
+        .select("lyric_id, word_index, text, start_ms, end_ms")
+        .in("lyric_id", lyricIds)
+        .returns<LyricWord[]>()
+    : { data: [] as LyricWord[] };
+  const timedLyrics = attachWordTiming(lyrics ?? [], words ?? []);
+
+  const renderLines = linesForSegment(timedLyrics, song.duration_seconds, segment);
   // Template defaults + per-clip overrides → the same effective style the
   // browser preview shows, so exports match the preview (font, size, style
   // preset, position, animation).

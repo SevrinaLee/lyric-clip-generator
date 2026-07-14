@@ -67,7 +67,7 @@ export type ClipSegment = {
   caption_size?: "sm" | "md" | "lg" | null;
   caption_position?: "center" | "lower" | null;
   caption_style_preset?: "box" | "outline" | "outline-yellow" | null;
-  caption_animation?: "fade" | "bounce" | "wordpop" | null;
+  caption_animation?: "fade" | "bounce" | "wordpop" | "karaoke" | null;
   hook_score: number | null;
   hook_score_source: string | null;
   hook_score_confidence: number | null;

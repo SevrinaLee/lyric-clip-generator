@@ -122,6 +122,33 @@ export function linesForSegment(
   return result;
 }
 
+/**
+ * Attaches lyric_words rows to their lyrics (ordered by word_index), so
+ * linesForSegment can pass real per-word timing through to render/preview.
+ * Lyrics without words are returned unchanged (even-split fallback).
+ */
+export function attachWordTiming(
+  lyrics: Lyric[],
+  words: { lyric_id: string; word_index: number; text: string; start_ms: number; end_ms: number }[],
+): Lyric[] {
+  if (!words.length) return lyrics;
+  const byLyric = new Map<string, typeof words>();
+  for (const w of words) {
+    const list = byLyric.get(w.lyric_id);
+    if (list) list.push(w);
+    else byLyric.set(w.lyric_id, [w]);
+  }
+  return lyrics.map((l) => {
+    const ws = byLyric.get(l.id);
+    if (!ws) return l;
+    const sorted = [...ws].sort((a, b) => a.word_index - b.word_index);
+    return {
+      ...l,
+      words: sorted.map((w) => ({ text: w.text, start_ms: w.start_ms, end_ms: w.end_ms })),
+    };
+  });
+}
+
 function assignPlatform(durationMs: number): GeneratedSegment["platform"] {
   if (durationMs < 15_000) return "shorts";
   if (durationMs <= 22_000) return "tiktok";

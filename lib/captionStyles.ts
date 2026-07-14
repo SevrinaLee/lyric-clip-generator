@@ -134,11 +134,22 @@ export const POSITION_PRESETS: Record<
 
 export const DEFAULT_POSITION: CaptionPosition = "center";
 
-// `wordpop` reveals a line word-by-word with a scale pop; `typewriter` from
-// old template rows maps to it (it was a no-op before). fade/bounce unchanged.
-export type CaptionAnimation = "fade" | "bounce" | "wordpop";
+// `wordpop` reveals a line word-by-word with a scale pop; `karaoke` fills each
+// word from an unsung colour to the sung colour as it's reached (premium).
+// `typewriter` from old template rows maps to wordpop (it was a no-op before).
+export type CaptionAnimation = "fade" | "bounce" | "wordpop" | "karaoke";
 
 export const DEFAULT_ANIMATION: CaptionAnimation = "fade";
+
+// Karaoke is the one premium animation. word-pop (even synced) stays free.
+export function isAnimationPremium(a: CaptionAnimation): boolean {
+  return a === "karaoke";
+}
+
+// ASS SecondaryColour used as the "unsung" fill for karaoke (\k swaps
+// Secondary→Primary as each word is reached). Primary stays the style preset's
+// colour, so karaoke works over any preset.
+export const KARAOKE_UNSUNG = "&H00808080";
 
 // Shared word-pop timing (ms) so the ASS transforms and the CSS keyframe stay
 // in lockstep. revealMs must be > 0: a zero-duration ASS \t collapses to a
@@ -158,14 +169,27 @@ export const MAX_WORDPOP_WORDS = 14;
 export function wordSchedule(
   text: string,
   lineDurationSec: number,
+  words?: { text: string; offsetSeconds: number }[],
 ): { word: string; startSec: number }[] {
-  const words = splitWords(text);
-  if (words.length === 0 || words.length > MAX_WORDPOP_WORDS) {
-    // Fallback: treat the whole line as one "word" revealed at the start.
-    return words.length ? [{ word: text.trim(), startSec: 0 }] : [];
+  // Real per-word timing (from lyric_words) when available — clamped into the
+  // line window and forced monotonic so karaoke/pop durations never go
+  // negative. Falls back to the even split for pasted/untimed lyrics.
+  if (words && words.length > 0) {
+    const upper = Math.max(0, lineDurationSec);
+    let last = 0;
+    return words.map((w) => {
+      const startSec = Math.min(Math.max(w.offsetSeconds, last), upper);
+      last = startSec;
+      return { word: w.text, startSec };
+    });
   }
-  const step = lineDurationSec / words.length;
-  return words.map((word, i) => ({ word, startSec: i * step }));
+  const split = splitWords(text);
+  if (split.length === 0 || split.length > MAX_WORDPOP_WORDS) {
+    // Fallback: treat the whole line as one "word" revealed at the start.
+    return split.length ? [{ word: text.trim(), startSec: 0 }] : [];
+  }
+  const step = lineDurationSec / split.length;
+  return split.map((word, i) => ({ word, startSec: i * step }));
 }
 
 // ── Resolution ──────────────────────────────────────────────────────────────
@@ -174,6 +198,7 @@ export type AssCaptionStyle = {
   fontFamily: string;
   fontSize: number;
   primary: string;
+  secondary: string;
   outline: string;
   back: string;
   borderStyle: number;
@@ -218,7 +243,9 @@ type StyleSegment = ClipStyleOverrides;
 function normalizeAnimation(raw: string | null | undefined): CaptionAnimation {
   // Legacy template rows store "typewriter" (a former no-op) — map to wordpop.
   if (raw === "typewriter") return "wordpop";
-  if (raw === "fade" || raw === "bounce" || raw === "wordpop") return raw;
+  if (raw === "fade" || raw === "bounce" || raw === "wordpop" || raw === "karaoke") {
+    return raw;
+  }
   return DEFAULT_ANIMATION;
 }
 
@@ -269,6 +296,8 @@ export function resolveClipStyle(
       fontFamily: font.assFamily,
       fontSize: sz.assFontSize,
       primary: preset.primary,
+      // Only karaoke uses SecondaryColour (the \k unsung fill); harmless otherwise.
+      secondary: animation === "karaoke" ? KARAOKE_UNSUNG : "&H000000FF",
       outline: preset.outline,
       back: preset.back,
       borderStyle: preset.borderStyle,

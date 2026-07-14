@@ -10,6 +10,8 @@ import {
   SIZE_PRESETS,
   STYLE_PRESETS,
   POSITION_PRESETS,
+  isAnimationPremium,
+  type CaptionAnimation,
 } from "@/lib/captionStyles";
 import { transcribeAudio } from "@/lib/whisper";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
@@ -363,12 +365,13 @@ export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdat
 
   if ("caption_animation" in updates) {
     const anim = updates.caption_animation;
-    if (
-      anim !== null &&
-      anim !== undefined &&
-      !["fade", "bounce", "wordpop"].includes(anim)
-    ) {
-      throw new Error("Unknown animation");
+    if (anim !== null && anim !== undefined) {
+      if (!["fade", "bounce", "wordpop", "karaoke"].includes(anim)) {
+        throw new Error("Unknown animation");
+      }
+      if (isAnimationPremium(anim as CaptionAnimation)) {
+        await requirePaid("caption animation");
+      }
     }
     patch.caption_animation = anim ?? null;
   }

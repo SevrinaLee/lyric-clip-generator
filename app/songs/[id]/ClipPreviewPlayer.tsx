@@ -8,13 +8,13 @@ import {
   type CaptionAnimation,
   type ResolvedClipStyle,
 } from "@/lib/captionStyles";
-
-type PreviewLine = { text: string; offsetSeconds: number };
+import type { PreviewLine } from "@/lib/scoring";
 
 const LINE_ANIMATION: Record<CaptionAnimation, string> = {
   fade: "animate-[clip-fade-in_0.4s_ease-out]",
   bounce: "animate-[clip-bounce_1s_ease-in-out_infinite]",
   wordpop: "",
+  karaoke: "",
 };
 
 export function ClipPreviewPlayer({
@@ -112,25 +112,54 @@ export function ClipPreviewPlayer({
               className={`${boxClass} inline-flex flex-wrap justify-center gap-x-1 leading-tight`}
               style={spanStyle}
             >
-              {wordSchedule(line.text, nextOffset - line.offsetSeconds).map(
-                (w, i) => {
-                  const shown = !isPlaying || lineElapsed >= w.startSec;
-                  return (
-                    <span
-                      key={i}
-                      style={{
-                        display: "inline-block",
-                        opacity: shown ? 1 : 0,
-                        transform: shown ? "scale(1)" : "scale(1.3)",
-                        transition:
-                          "opacity 90ms ease, transform 220ms cubic-bezier(.2,1.5,.4,1)",
-                      }}
-                    >
-                      {w.word}
-                    </span>
-                  );
-                },
-              )}
+              {wordSchedule(
+                line.text,
+                nextOffset - line.offsetSeconds,
+                line.words,
+              ).map((w, i) => {
+                const shown = !isPlaying || lineElapsed >= w.startSec;
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      display: "inline-block",
+                      opacity: shown ? 1 : 0,
+                      transform: shown ? "scale(1)" : "scale(1.3)",
+                      transition:
+                        "opacity 90ms ease, transform 220ms cubic-bezier(.2,1.5,.4,1)",
+                    }}
+                  >
+                    {w.word}
+                  </span>
+                );
+              })}
+            </span>
+          ) : p.animation === "karaoke" && line ? (
+            <span
+              className={`${boxClass} inline-flex flex-wrap justify-center gap-x-1 leading-tight`}
+              style={spanStyle}
+            >
+              {wordSchedule(
+                line.text,
+                nextOffset - line.offsetSeconds,
+                line.words,
+              ).map((w, i) => {
+                // Sung words take the caption colour; unsung dim (mirrors the
+                // ASS \k Secondary→Primary fill).
+                const sung = !isPlaying || lineElapsed >= w.startSec;
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      display: "inline-block",
+                      color: sung ? p.color : "#808080",
+                      transition: "color 120ms linear",
+                    }}
+                  >
+                    {w.word}
+                  </span>
+                );
+              })}
             </span>
           ) : (
             <span

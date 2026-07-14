@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { ClipSegment, Export, Lyric, Song, VideoTemplate } from "@/lib/types";
+import type { ClipSegment, Export, Lyric, LyricWord, Song, VideoTemplate } from "@/lib/types";
 import { LyricEntryForm } from "./LyricEntryForm";
 import { GenerateClipsButton } from "./GenerateClipsButton";
 import { SegmentsPanel } from "./SegmentsPanel";
@@ -10,7 +10,7 @@ import { CheckoutStatusWatcher } from "./CheckoutStatusWatcher";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
 import type { EditableLine } from "./EditableLyricsTable";
 import { LyricsEditPanel } from "./LyricsEditPanel";
-import { linesForSegment, timeLines } from "@/lib/scoring";
+import { linesForSegment, timeLines, attachWordTiming, type PreviewLine } from "@/lib/scoring";
 import { googleFontsUrl } from "@/lib/fonts";
 import { FONT_REGISTRY } from "@/lib/captionStyles";
 import { evaluateSongAccess } from "@/lib/access";
@@ -109,15 +109,29 @@ export default async function SongDetailPage({
     }
   }
 
+  // Attach per-word timing (lyric_words) so the preview's synced word-pop /
+  // karaoke matches what the export renders. Only needed for the owner view.
+  const wordRows =
+    isOwner && (lyrics?.length ?? 0) > 0
+      ? (
+          await supabase
+            .from("lyric_words")
+            .select("lyric_id, word_index, text, start_ms, end_ms")
+            .in("lyric_id", (lyrics ?? []).map((l) => l.id))
+            .returns<LyricWord[]>()
+        ).data ?? []
+      : [];
+  const timedLyrics = attachWordTiming(lyrics ?? [], wordRows);
+
   // Precompute which lyric lines fall in each segment's window (same
   // logic queueExport uses to build captions) so the live preview shows
   // exactly what the export will render.
-  const linesBySegment = new Map<string, { text: string; offsetSeconds: number }[]>();
+  const linesBySegment = new Map<string, PreviewLine[]>();
   if (isOwner) {
     for (const seg of segments ?? []) {
       linesBySegment.set(
         seg.id,
-        linesForSegment(lyrics ?? [], song.duration_seconds, seg),
+        linesForSegment(timedLyrics, song.duration_seconds, seg),
       );
     }
   }

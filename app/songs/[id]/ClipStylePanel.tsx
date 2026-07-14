@@ -12,6 +12,7 @@ import {
   DEFAULT_STYLE_PRESET,
   selectableFonts,
   resolveClipStyle,
+  isAnimationPremium,
   type ClipStyleOverrides,
   type CaptionSize,
   type CaptionPosition,
@@ -34,6 +35,7 @@ const ANIM_LABEL: Record<CaptionAnimation, string> = {
   fade: "Fade",
   bounce: "Bounce",
   wordpop: "Word pop",
+  karaoke: "Karaoke",
 };
 
 const NO_OVERRIDES: ClipStyleOverrides = {
@@ -106,6 +108,10 @@ export function ClipStylePanel({
     commit({ ...ov, caption_style_preset: sp === DEFAULT_STYLE_PRESET ? null : sp });
   }
   function handleAnim(a: CaptionAnimation) {
+    if (isAnimationPremium(a) && !paidTier) {
+      setError("Premium animation — unlock this song to use it.");
+      return;
+    }
     const inherited = resolveClipStyle(template, {
       ...ov,
       caption_animation: null,
@@ -201,16 +207,23 @@ export function ClipStylePanel({
             </div>
 
             <div className="flex rounded-lg border border-ink/15 overflow-hidden">
-              {(["fade", "bounce", "wordpop"] as CaptionAnimation[]).map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => handleAnim(a)}
-                  className={chip(eff.animation === a)}
-                >
-                  {ANIM_LABEL[a]}
-                </button>
-              ))}
+              {(["fade", "bounce", "wordpop", "karaoke"] as CaptionAnimation[]).map(
+                (a) => {
+                  const locked = isAnimationPremium(a) && !paidTier;
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => handleAnim(a)}
+                      title={locked ? `${ANIM_LABEL[a]} — premium` : ANIM_LABEL[a]}
+                      className={chip(eff.animation === a)}
+                    >
+                      {ANIM_LABEL[a]}
+                      {locked ? " 🔒" : isAnimationPremium(a) ? " ★" : ""}
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
 

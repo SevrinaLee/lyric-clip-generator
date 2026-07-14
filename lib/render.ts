@@ -48,8 +48,11 @@ function formatAssTime(seconds: number): string {
 // a brief scale bump). All words share one event so libass lays the line out
 // at full width once — words appear in place with no reflow jitter. Timing
 // comes from the shared wordSchedule so the CSS preview matches.
+// One Dialogue event that reveals a line word-by-word: each word starts
+// hidden (\alpha FF) and, at its scheduled offset, pops in. Uses real per-word
+// timing when the line carries it (line.words), else the even split.
 function wordPopEventText(line: RenderLine, lineDurationSeconds: number): string {
-  const sched = wordSchedule(line.text, lineDurationSeconds);
+  const sched = wordSchedule(line.text, lineDurationSeconds, line.words);
   if (sched.length === 0) return "";
   const { revealMs, popInMs, settleMs, scalePct } = WORDPOP;
   return sched
@@ -69,6 +72,30 @@ function wordPopEventText(line: RenderLine, lineDurationSeconds: number): string
     .join("");
 }
 
+// One Dialogue event that fills each word from the unsung (SecondaryColour) to
+// the sung (PrimaryColour) as it's reached, via ASS \k (centiseconds). Uses
+// real word timing when present, else the even split. \k only recolours, so it
+// composes with any style preset.
+function karaokeEventText(line: RenderLine, lineDurationSeconds: number): string {
+  const sched = wordSchedule(line.text, lineDurationSeconds, line.words);
+  if (sched.length === 0) return "";
+  // \k accumulates from the event start, so a lead-in empty syllable delays the
+  // first word's fill to its actual offset (otherwise every word fills one slot
+  // early when the first word doesn't start at 0).
+  const leadCs = Math.round(sched[0].startSec * 100);
+  const lead = leadCs > 0 ? `{\\k${leadCs}}` : "";
+  return (
+    lead +
+    sched
+      .map(({ word, startSec }, i) => {
+        const nextStart = sched[i + 1]?.startSec ?? Math.max(0, lineDurationSeconds);
+        const durCs = Math.max(1, Math.round((nextStart - startSec) * 100));
+        return `{\\k${durCs}}${escapeAssText(word)} `;
+      })
+      .join("")
+  );
+}
+
 function buildAssSubtitle(
   lines: RenderLine[],
   durationSeconds: number,
@@ -86,7 +113,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${cap.fontFamily},${cap.fontSize},${cap.primary},&H000000FF,${cap.outline},${cap.back},0,0,0,0,100,100,0,0,${cap.borderStyle},${cap.outlineWidth},${cap.shadow},${cap.alignment},40,40,${cap.marginV},1
+Style: Default,${cap.fontFamily},${cap.fontSize},${cap.primary},${cap.secondary},${cap.outline},${cap.back},0,0,0,0,100,100,0,0,${cap.borderStyle},${cap.outlineWidth},${cap.shadow},${cap.alignment},40,40,${cap.marginV},1
 Style: Watermark,${FONT_FAMILY},34,&H50FFFFFF,&H000000FF,&H80000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,44,1
 
 [Events]
@@ -101,6 +128,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
       if (cap.animation === "wordpop") {
         const body = wordPopEventText(line, nextOffset - line.offsetSeconds);
+        return `Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`;
+      }
+      if (cap.animation === "karaoke") {
+        const body = karaokeEventText(line, nextOffset - line.offsetSeconds);
         return `Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`;
       }
 
@@ -141,7 +172,13 @@ function run(cmd: string, args: string[]): Promise<void> {
   });
 }
 
-export type RenderLine = { text: string; offsetSeconds: number };
+export type RenderLine = {
+  text: string;
+  offsetSeconds: number;
+  // Per-word timing relative to the segment start, when available (drives
+  // synced word-pop/karaoke); absent = even split.
+  words?: { text: string; offsetSeconds: number }[];
+};
 
 // Resolves a background_style into the ffmpeg pieces the render needs:
 //  - lavfiInput: the `-f lavfi -i` source that becomes input [1]

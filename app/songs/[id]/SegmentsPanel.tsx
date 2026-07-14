@@ -10,6 +10,7 @@ import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
 import { ClipStylePanel } from "./ClipStylePanel";
 import { SharePanel } from "./SharePanel";
 import { resolveClipStyle, type ClipStyleOverrides } from "@/lib/captionStyles";
+import type { PreviewLine } from "@/lib/scoring";
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
@@ -22,8 +23,6 @@ const PLATFORM_ACCENT: Record<string, string> = {
   reels: "bg-sky",
   shorts: "bg-sage",
 };
-
-type PreviewLine = { text: string; offsetSeconds: number };
 
 export function SegmentsPanel({
   songId,
