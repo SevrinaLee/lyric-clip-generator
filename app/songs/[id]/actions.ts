@@ -5,7 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { generateSegments } from "@/lib/scoring";
 import { evaluateSongAccess, exportTier } from "@/lib/access";
 import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
-import { FONT_REGISTRY, SIZE_PRESETS } from "@/lib/captionStyles";
+import {
+  FONT_REGISTRY,
+  SIZE_PRESETS,
+  STYLE_PRESETS,
+  POSITION_PRESETS,
+} from "@/lib/captionStyles";
 import { transcribeAudio } from "@/lib/whisper";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
 
@@ -250,10 +255,15 @@ export async function selectTemplate(segmentId: string, templateId: string) {
 // Per-clip caption style overrides (null = revert to template default).
 // Values are validated against the registries and premium fonts are gated
 // server-side, mirroring selectTemplate — never trust the picker UI alone.
-export async function updateClipStyle(
-  segmentId: string,
-  updates: { caption_font?: string | null; caption_size?: string | null },
-) {
+type ClipStyleUpdates = {
+  caption_font?: string | null;
+  caption_size?: string | null;
+  caption_position?: string | null;
+  caption_style_preset?: string | null;
+  caption_animation?: string | null;
+};
+
+export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdates) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -267,19 +277,26 @@ export async function updateClipStyle(
     .maybeSingle<{ song_id: string }>();
   if (!segment) throw new Error("Clip segment not found");
 
-  const patch: { caption_font?: string | null; caption_size?: string | null } = {};
+  // Cache paid-access lookup: several premium-gated options may be set at once.
+  let paidChecked = false;
+  let isPaid = false;
+  const requirePaid = async (label: string) => {
+    if (!paidChecked) {
+      const access = await evaluateSongAccess(user.id, segment.song_id);
+      isPaid = exportTier(access.reason).label === "paid";
+      paidChecked = true;
+    }
+    if (!isPaid) throw new Error(`Premium ${label} — unlock this song to use it.`);
+  };
+
+  const patch: ClipStyleUpdates = {};
 
   if ("caption_font" in updates) {
     const font = updates.caption_font;
     if (font !== null && font !== undefined) {
       const def = FONT_REGISTRY[font];
       if (!def) throw new Error("Unknown font");
-      if (def.isPremium) {
-        const access = await evaluateSongAccess(user.id, segment.song_id);
-        if (exportTier(access.reason).label !== "paid") {
-          throw new Error("Premium font — unlock this song to use it.");
-        }
-      }
+      if (def.isPremium) await requirePaid("font");
     }
     patch.caption_font = font ?? null;
   }
@@ -290,6 +307,36 @@ export async function updateClipStyle(
       throw new Error("Unknown size");
     }
     patch.caption_size = size ?? null;
+  }
+
+  if ("caption_position" in updates) {
+    const pos = updates.caption_position;
+    if (pos !== null && pos !== undefined && !(pos in POSITION_PRESETS)) {
+      throw new Error("Unknown position");
+    }
+    patch.caption_position = pos ?? null;
+  }
+
+  if ("caption_style_preset" in updates) {
+    const sp = updates.caption_style_preset;
+    if (sp !== null && sp !== undefined) {
+      const preset = STYLE_PRESETS[sp as keyof typeof STYLE_PRESETS];
+      if (!preset) throw new Error("Unknown style preset");
+      if (preset.isPremium) await requirePaid("caption style");
+    }
+    patch.caption_style_preset = sp ?? null;
+  }
+
+  if ("caption_animation" in updates) {
+    const anim = updates.caption_animation;
+    if (
+      anim !== null &&
+      anim !== undefined &&
+      !["fade", "bounce", "wordpop"].includes(anim)
+    ) {
+      throw new Error("Unknown animation");
+    }
+    patch.caption_animation = anim ?? null;
   }
 
   if (Object.keys(patch).length === 0) return;

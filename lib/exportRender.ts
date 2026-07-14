@@ -36,7 +36,8 @@ export async function renderSegmentToBuffer(
 
   const renderLines = linesForSegment(lyrics ?? [], song.duration_seconds, segment);
   // Template defaults + per-clip overrides → the same effective style the
-  // browser preview shows, so exports finally match the preview's font.
+  // browser preview shows, so exports match the preview (font, size, style
+  // preset, position, animation).
   const style = resolveClipStyle(template, segment);
   return renderClip({
     audioUrl: song.audio_url,
@@ -44,13 +45,11 @@ export async function renderSegmentToBuffer(
     endMs: segment.end_ms,
     lines: renderLines,
     primaryColor: template.primary_color,
-    animationPreset: template.animation_preset,
     backgroundStyle: template.background_style,
     watermark: tier.watermark,
     width: tier.width,
     height: tier.height,
-    fontFamily: style.font.assFamily,
-    fontSize: style.assFontSize,
+    caption: style.ass,
   });
 }
 

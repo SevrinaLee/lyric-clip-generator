@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:security": "node --test \"tests/security/**/*.test.mjs\""
+    "test:security": "node --test \"tests/security/**/*.test.mjs\"",
+    "verify:captions": "tsx scripts/verify-captions.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
@@ -27,6 +28,7 @@
     "eslint": "^9",
     "eslint-config-next": "^15.0.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   },
   "packageManager": "bun@1.1.30",

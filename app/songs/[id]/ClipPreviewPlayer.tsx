@@ -3,14 +3,18 @@
 import { useRef, useState } from "react";
 import type { VideoTemplate } from "@/lib/types";
 import { cssBackground, parseBackgroundStyle } from "@/lib/backgrounds";
-import type { ResolvedClipStyle } from "@/lib/captionStyles";
+import {
+  wordSchedule,
+  type CaptionAnimation,
+  type ResolvedClipStyle,
+} from "@/lib/captionStyles";
 
 type PreviewLine = { text: string; offsetSeconds: number };
 
-const LINE_ANIMATION: Record<VideoTemplate["animation_preset"], string> = {
+const LINE_ANIMATION: Record<CaptionAnimation, string> = {
   fade: "animate-[clip-fade-in_0.4s_ease-out]",
   bounce: "animate-[clip-bounce_1s_ease-in-out_infinite]",
-  typewriter: "",
+  wordpop: "",
 };
 
 export function ClipPreviewPlayer({
@@ -33,6 +37,7 @@ export function ClipPreviewPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [relative, setRelative] = useState(0);
 
   const durationSeconds = (endMs - startMs) / 1000;
 
@@ -55,21 +60,39 @@ export function ClipPreviewPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const relative = audio.currentTime - startMs / 1000;
-    if (relative >= durationSeconds) {
+    const rel = audio.currentTime - startMs / 1000;
+    if (rel >= durationSeconds) {
       audio.pause();
       audio.currentTime = startMs / 1000;
       setIsPlaying(false);
       setActiveIndex(0);
+      setRelative(0);
       return;
     }
 
+    setRelative(rel);
     let next = 0;
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].offsetSeconds <= relative) next = i;
+      if (lines[i].offsetSeconds <= rel) next = i;
     }
     setActiveIndex(next);
   }
+
+  const p = clipStyle.preview;
+  const line = lines[activeIndex];
+  const nextOffset = lines[activeIndex + 1]?.offsetSeconds ?? durationSeconds;
+  const lineElapsed = relative - (line?.offsetSeconds ?? 0);
+
+  // Box preset = black backing box; outline presets = no box + text outline
+  // (approximated with a multi-shadow). Mirrors the export's ASS style.
+  const boxClass = p.box ? "rounded bg-black/60 px-1.5 py-1" : "px-1";
+  const spanStyle = {
+    fontFamily: `"${p.cssFamily}", sans-serif`,
+    fontWeight: p.cssWeight,
+    fontSize: `${p.fontSizePx}px`,
+    color: p.color,
+    textShadow: p.box ? undefined : p.textShadow,
+  } as const;
 
   return (
     <div className="flex items-center gap-3">
@@ -81,20 +104,43 @@ export function ClipPreviewPlayer({
           ),
         }}
       >
-        <div className="absolute inset-0 flex items-center justify-center p-2 text-center">
-          {/* Mirrors the export's ASS style: white text on a ~65% black box,
-              which keeps captions readable over any background visual. */}
-          <span
-            key={activeIndex}
-            className={`rounded bg-black/60 px-1.5 py-1 leading-tight text-white ${LINE_ANIMATION[template.animation_preset]}`}
-            style={{
-              fontFamily: `"${clipStyle.font.cssFamily}", sans-serif`,
-              fontWeight: clipStyle.font.cssWeight,
-              fontSize: `${clipStyle.previewPx}px`,
-            }}
-          >
-            {lines[activeIndex]?.text}
-          </span>
+        <div
+          className={`absolute inset-0 flex justify-center p-2 text-center ${p.align}`}
+        >
+          {p.animation === "wordpop" && line ? (
+            <span
+              className={`${boxClass} inline-flex flex-wrap justify-center gap-x-1 leading-tight`}
+              style={spanStyle}
+            >
+              {wordSchedule(line.text, nextOffset - line.offsetSeconds).map(
+                (w, i) => {
+                  const shown = !isPlaying || lineElapsed >= w.startSec;
+                  return (
+                    <span
+                      key={i}
+                      style={{
+                        display: "inline-block",
+                        opacity: shown ? 1 : 0,
+                        transform: shown ? "scale(1)" : "scale(1.3)",
+                        transition:
+                          "opacity 90ms ease, transform 220ms cubic-bezier(.2,1.5,.4,1)",
+                      }}
+                    >
+                      {w.word}
+                    </span>
+                  );
+                },
+              )}
+            </span>
+          ) : (
+            <span
+              key={activeIndex}
+              className={`${boxClass} leading-tight ${LINE_ANIMATION[p.animation]}`}
+              style={spanStyle}
+            >
+              {line?.text}
+            </span>
+          )}
         </div>
       </div>
 

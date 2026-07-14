@@ -449,6 +449,78 @@ describe("6. Per-clip caption style columns (0012)", () => {
   });
 });
 
+// ── 7. PER-CLIP CAPTION PRESETS (migration 0013) ───────────────────────────
+// Same guarantees as §6 for the position/style-preset/animation columns:
+// owner-writable, other users/anon blocked, and DB CHECK constraints reject
+// out-of-set values. (Premium gating for outline-yellow lives in the
+// updateClipStyle server action.)
+describe("7. Per-clip caption preset columns (0013)", () => {
+  let segmentId;
+
+  before(async () => {
+    const { data: seg, error } = await ctx.a.client
+      .from("clip_segments")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        label: "Chorus",
+        start_ms: 0,
+        end_ms: 8000,
+        platform: "tiktok",
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A should insert own clip segment");
+    segmentId = seg.id;
+  });
+
+  it("positive control: A can set own caption presets", async () => {
+    const { data, error } = await ctx.a.client
+      .from("clip_segments")
+      .update({
+        caption_position: "lower",
+        caption_style_preset: "outline",
+        caption_animation: "wordpop",
+      })
+      .eq("id", segmentId)
+      .select("caption_position, caption_style_preset, caption_animation");
+    assert.equal(error, null);
+    assert.equal(data?.[0]?.caption_position, "lower");
+    assert.equal(data?.[0]?.caption_style_preset, "outline");
+    assert.equal(data?.[0]?.caption_animation, "wordpop");
+  });
+
+  it("B cannot modify A's caption presets", async () => {
+    const { data } = await ctx.b.client
+      .from("clip_segments")
+      .update({ caption_style_preset: "outline-yellow" })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "update must affect zero rows");
+
+    const { data: check } = await admin
+      .from("clip_segments")
+      .select("caption_style_preset")
+      .eq("id", segmentId)
+      .single();
+    assert.equal(check.caption_style_preset, "outline", "unchanged");
+  });
+
+  it("DB CHECK rejects out-of-set preset values from the owner", async () => {
+    for (const patch of [
+      { caption_position: "sideways" },
+      { caption_style_preset: "rainbow" },
+      { caption_animation: "explode" },
+    ]) {
+      const { error } = await ctx.a.client
+        .from("clip_segments")
+        .update(patch)
+        .eq("id", segmentId);
+      assert.ok(error, `must reject ${JSON.stringify(patch)}`);
+    }
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

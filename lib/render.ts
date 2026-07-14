@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import { parseBackgroundStyle } from "./backgrounds";
+import { WORDPOP, wordSchedule, type AssCaptionStyle } from "./captionStyles";
 
 // Vendored copy of Next.js's bundled Noto Sans (SIL OFL) — see assets/fonts.
 // require.resolve("next/package.json") is NOT safe here: in Vercel's
@@ -42,16 +43,41 @@ function formatAssTime(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(c).padStart(2, "0")}`;
 }
 
+// One Dialogue event that reveals a line word-by-word: each word starts
+// hidden (\alpha FF) and, at its scheduled offset, pops in (instant reveal +
+// a brief scale bump). All words share one event so libass lays the line out
+// at full width once — words appear in place with no reflow jitter. Timing
+// comes from the shared wordSchedule so the CSS preview matches.
+function wordPopEventText(line: RenderLine, lineDurationSeconds: number): string {
+  const sched = wordSchedule(line.text, lineDurationSeconds);
+  if (sched.length === 0) return "";
+  const { revealMs, popInMs, settleMs, scalePct } = WORDPOP;
+  return sched
+    .map(({ word, startSec }) => {
+      const t = Math.round(startSec * 1000);
+      const w = escapeAssText(word);
+      // Reset scale/alpha per word (so state can't bleed from the previous
+      // word), hide it, then fade+pop in at t. The reveal uses a real (non-
+      // zero) duration — a zero-length \t ramps alpha over the whole event.
+      return (
+        `{\\fscx100\\fscy100\\alpha&HFF&` +
+        `\\t(${t},${t + revealMs},\\alpha&H00&)` +
+        `\\t(${t},${t + popInMs},\\fscx${scalePct}\\fscy${scalePct})` +
+        `\\t(${t + popInMs},${t + popInMs + settleMs},\\fscx100\\fscy100)}${w} `
+      );
+    })
+    .join("");
+}
+
 function buildAssSubtitle(
   lines: RenderLine[],
   durationSeconds: number,
-  animationPreset: "fade" | "bounce" | "typewriter",
   watermark: boolean,
-  fontFamily: string,
-  fontSize: number,
+  cap: AssCaptionStyle,
 ): string {
   // Watermark style: bottom-centre (Alignment 2), small, ~60% opacity white
-  // with a soft outline so it stays legible over any background.
+  // with a soft outline so it stays legible over any background. The caption
+  // (Default) style is driven by the resolved per-clip style.
   const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${DESIGN_W}
@@ -60,7 +86,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontFamily},${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&HA6000000,0,0,0,0,100,100,0,0,3,20,0,5,40,40,40,1
+Style: Default,${cap.fontFamily},${cap.fontSize},${cap.primary},&H000000FF,${cap.outline},${cap.back},0,0,0,0,100,100,0,0,${cap.borderStyle},${cap.outlineWidth},${cap.shadow},${cap.alignment},40,40,${cap.marginV},1
 Style: Watermark,${FONT_FAMILY},34,&H50FFFFFF,&H000000FF,&H80000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,40,40,44,1
 
 [Events]
@@ -72,15 +98,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const nextOffset = lines[i + 1]?.offsetSeconds ?? durationSeconds;
       const start = formatAssTime(line.offsetSeconds);
       const end = formatAssTime(nextOffset);
-      const text = escapeAssText(line.text);
 
-      let tag = "";
-      if (animationPreset === "fade") {
-        tag = "{\\fad(400,0)}";
-      } else if (animationPreset === "bounce") {
-        tag = "{\\t(0,150,\\fscx115\\fscy115)\\t(150,300,\\fscx100\\fscy100)}";
+      if (cap.animation === "wordpop") {
+        const body = wordPopEventText(line, nextOffset - line.offsetSeconds);
+        return `Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`;
       }
 
+      const text = escapeAssText(line.text);
+      let tag = "";
+      if (cap.animation === "fade") {
+        tag = "{\\fad(400,0)}";
+      } else if (cap.animation === "bounce") {
+        tag = "{\\t(0,150,\\fscx115\\fscy115)\\t(150,300,\\fscx100\\fscy100)}";
+      }
       return `Dialogue: 0,${start},${end},Default,,0,0,0,,${tag}${text}`;
     })
     .join("\n");
@@ -136,28 +166,23 @@ export async function renderClip({
   endMs,
   lines,
   primaryColor,
-  animationPreset,
+  caption,
   backgroundStyle,
   watermark = false,
   width = DESIGN_W,
   height = DESIGN_H,
-  fontFamily = FONT_FAMILY,
-  fontSize = 64,
 }: {
   audioUrl: string;
   startMs: number;
   endMs: number;
   lines: RenderLine[];
   primaryColor: string;
-  animationPreset: "fade" | "bounce" | "typewriter";
+  /** Resolved caption style (font, size, preset, position, animation) */
+  caption: AssCaptionStyle;
   backgroundStyle?: string | null;
   watermark?: boolean;
   width?: number;
   height?: number;
-  /** ASS family name of a vendored TTF (see lib/captionStyles.ts) */
-  fontFamily?: string;
-  /** Caption font size in the 1080x1920 design space */
-  fontSize?: number;
 }): Promise<Buffer> {
   if (!ffmpegPath) throw new Error("ffmpeg binary not found");
 
@@ -176,14 +201,7 @@ export async function renderClip({
 
     await writeFile(
       assPath,
-      buildAssSubtitle(
-        lines,
-        durationSeconds,
-        animationPreset,
-        watermark,
-        fontFamily,
-        fontSize,
-      ),
+      buildAssSubtitle(lines, durationSeconds, watermark, caption),
     );
 
     const assFilterPath = escapeFilterPath(assPath);

@@ -9,7 +9,7 @@ import { TemplatePicker } from "./TemplatePicker";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
 import { ClipStyleRow } from "./ClipStyleRow";
 import { SharePanel } from "./SharePanel";
-import { resolveClipStyle, type CaptionSize } from "@/lib/captionStyles";
+import { resolveClipStyle, type ClipStyleOverrides } from "@/lib/captionStyles";
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
@@ -111,17 +111,17 @@ function SegmentRow({
   );
   // Per-clip caption overrides, kept in client state so the preview updates
   // instantly; persisted through the updateClipStyle action by ClipStyleRow.
-  const [captionFont, setCaptionFont] = useState(segment.caption_font ?? null);
-  const [captionSize, setCaptionSize] = useState<CaptionSize | null>(
-    segment.caption_size ?? null,
-  );
+  const [overrides, setOverrides] = useState<ClipStyleOverrides>({
+    caption_font: segment.caption_font ?? null,
+    caption_size: segment.caption_size ?? null,
+    caption_position: segment.caption_position ?? null,
+    caption_style_preset: segment.caption_style_preset ?? null,
+    caption_animation: segment.caption_animation ?? null,
+  });
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
   const clipStyle = selectedTemplate
-    ? resolveClipStyle(selectedTemplate, {
-        caption_font: captionFont,
-        caption_size: captionSize,
-      })
+    ? resolveClipStyle(selectedTemplate, overrides)
     : null;
 
   // Staleness is DERIVED (not stored) so it re-evaluates whenever a timing
@@ -179,17 +179,15 @@ function SegmentRow({
         onSelect={setSelectedTemplateId}
       />
 
-      <ClipStyleRow
-        segmentId={segment.id}
-        templateFont={selectedTemplate?.font ?? "Noto Sans"}
-        initialFont={captionFont}
-        initialSize={captionSize}
-        paidTier={accessReason === "founder" || accessReason === "paid"}
-        onChange={(font, size) => {
-          setCaptionFont(font);
-          setCaptionSize(size);
-        }}
-      />
+      {selectedTemplate && (
+        <ClipStyleRow
+          segmentId={segment.id}
+          template={selectedTemplate}
+          initial={overrides}
+          paidTier={accessReason === "founder" || accessReason === "paid"}
+          onChange={setOverrides}
+        />
+      )}
 
       {selectedTemplate && clipStyle && audioUrl && lines.length > 0 && (
         <ClipPreviewPlayer
