@@ -30,6 +30,11 @@ export function PaymentGate({ songId }: { songId: string }) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap rounded-2xl bg-gold/10 border border-gold/25 p-3">
+      <p className="w-full text-sm text-ink/70">
+        <span className="font-semibold text-ink">Your free song is already used.</span>{" "}
+        Unlock this one to download — you&apos;ll also get watermark-free 1080p
+        and premium styles.
+      </p>
       <button
         onClick={() => startCheckout("single")}
         disabled={loadingPlan !== null}

@@ -94,6 +94,12 @@ export default async function SongDetailPage({
         }))
       : [];
 
+  // Captions only match the vocals when lines have real timing; count how many
+  // are still estimated so the editor can prompt the user to sync them. Whether
+  // auto-transcription is even offered depends on the server having a key.
+  const estimatedCount = editableLyrics.filter((l) => l.isEstimated).length;
+  const transcribeEnabled = !!process.env.OPENAI_API_KEY;
+
   // Latest export per clip_segment_id (exports is queried unfiltered since
   // there's no FK to song_id — fine at this dataset size for v1).
   const exportsBySegment = new Map<string, Export>();
@@ -186,7 +192,13 @@ export default async function SongDetailPage({
               <p className="text-ink/50 text-sm">No lyrics yet.</p>
             )
           ) : isOwner ? (
-            <LyricsEditPanel lyrics={editableLyrics} audioUrl={song.audio_url} />
+            <LyricsEditPanel
+              lyrics={editableLyrics}
+              audioUrl={song.audio_url}
+              songId={song.id}
+              estimatedCount={estimatedCount}
+              transcribeEnabled={transcribeEnabled}
+            />
           ) : (
             <ol className="space-y-1.5 text-sm">
               {lyrics!.map((line) => (

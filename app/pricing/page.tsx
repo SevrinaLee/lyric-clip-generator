@@ -33,13 +33,31 @@ export default function PricingPage() {
             ✦ Pricing
           </span>
           <h1 className="font-display text-4xl sm:text-5xl text-ink">
-            Pay per song, or go unlimited
+            Your first song is free
           </h1>
-          <p className="text-ink/60 max-w-md mx-auto">
-            Previews are always free. You only pay when you want to download
-            the finished clips.
+          <p className="text-ink/60 max-w-lg mx-auto">
+            Upload, edit, preview, and download clips from your first song at no
+            cost. You only pay from your second song onward — or to remove the
+            watermark and go full HD on any song.
           </p>
         </div>
+
+        <section className="rounded-3xl bg-sage/15 border border-sage/40 p-6 text-center space-y-1">
+          <p className="text-sm font-bold uppercase tracking-[0.15em] text-ink/50">
+            Free — your first song
+          </p>
+          <p className="font-display text-2xl text-ink">
+            Every clip, downloadable
+          </p>
+          <p className="text-ink/60 text-sm max-w-md mx-auto">
+            Full editor, all animations, and downloads — clips carry a small
+            watermark and export at 720p. Upgrade any song below to remove it.
+          </p>
+        </section>
+
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.15em] text-ink/40">
+          From your second song — or to upgrade
+        </p>
 
         <div className="grid sm:grid-cols-2 gap-6">
           <section className="rounded-3xl bg-cream-deep border border-ink/10 p-7 space-y-5 flex flex-col">
@@ -100,9 +118,9 @@ export default function PricingPage() {
 
         <p className="text-center text-sm text-ink/50">
           Pay by card, PayNow QR, or GrabPay — secure checkout via Stripe.
-          Checkout happens when you export your first clip — upload a song,
-          pick your favorite moment, and choose a plan at the download step.
-          Manage or cancel your subscription anytime from{" "}
+          Your first song is free; a plan is only offered at the download step
+          on later songs (or when you choose to remove the watermark). Manage or
+          cancel your subscription anytime from{" "}
           <Link href="/account" className="underline underline-offset-2 hover:text-ink">
             your account
           </Link>
