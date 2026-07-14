@@ -2,7 +2,7 @@
 
 > A build-and-decisions log of the work that took this app from an empty repo to a live, paying product — written for the whole team.
 
-**Version 1.1 — post-launch expansion**
+**Version 1.2 — clip aesthetics**
 
 - Repository: github.com/SevrinaLee/lyric-clip-generator
 - Live: lyric-clip-generator.vercel.app
@@ -256,6 +256,8 @@ With a shippable 1.0 live, the next phase reshaped the journey from a one-and-do
 >
 > Every free clip carries a small 'made with Lyric Clip Generator' mark, so shared free clips advertise the app. Because rendering happens before payment, the download route lazily re-renders a clean HD version on the first paid download - so paying genuinely removes the mark.
 
+A later refinement closed a trust gap in this loop. A rendered clip is a baked file, so editing lyric timing afterwards left the download silently out of date. Each clip zone now shows a Refresh control that re-renders from the latest saved timing, and when timing changes after a render the zone auto-flags itself 'outdated' (comparing the song's most recent lyric edit to when the clip was rendered) while reassuring the user that the live preview is already current. The result is an explicit guarantee that the downloadable clip can always be brought in line with the latest timing.
+
 | Journey step | Status |
 | --- | --- |
 | Discover (landing / pricing / FAQ) | 🟢 Live |
@@ -280,13 +282,21 @@ With a shippable 1.0 live, the next phase reshaped the journey from a one-and-do
 
 *Journey after Phase 7: Share + caption and the My clips library are live, and the pay step now drives a watermark / resolution / premium-template value ladder.*
 
-## 3.  Where the app stands today (v1.1)
+### Phase 8 - Making clips scroll-stopping (v1.2)
+
+With the loop complete, the clips themselves still looked plain, so a four-sprint push made them customizable and eye-catching. Sprint 1 fixed a live bug - every export had rendered in one fallback font regardless of the template - by vendoring real font files and threading the chosen font and size all the way through, then let users pick per clip. Sprint 2 added the viral-caption toolkit: a high-contrast outlined style, a lower-third position, and word-by-word reveal with a pop (which also fixed a caption animation that had quietly done nothing). Sprint 3 gave backgrounds motion - a gently pulsing gradient, and a premium background that draws the song's own waveform reacting in real time. Sprint 4 gathered every control into one collapsible 'Customize' panel with a reset-to-template.
+
+- Single source of truth - one module resolves a clip's caption style and another resolves its background, and BOTH the live browser preview and the ffmpeg render read the same resolved values, so what you preview is what you download.
+- Value ladder preserved - the bold look, outline style, lower third, word-pop, and a pulsing background are free; extra display fonts, the yellow-emphasis style, and audio-reactive waveform backgrounds are premium, all re-checked server-side.
+- Verified by frames - because captions are burned in, each new style and background is checked by rendering a real clip and inspecting extracted frames (npm run verify:captions), which is how a subtle libass timing bug in the word reveal was caught and fixed.
+
+## 3.  Where the app stands today (v1.2)
 
 Every step of the core user journey works in live production: a real person can discover the app, sign up, upload audio, generate and preview clips, pay by card / PayNow / GrabPay, and download a finished MP4 — and now re-find it in a clips library and get help sharing it. The paid tier is a clear value ladder (no watermark, full HD, premium templates).
 
 ### Live and working
 
-Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the watermark / resolution / premium-template value ladder, the My clips library, share + caption helpers, the account area, the navigation shell, and an automated security suite running on every change.
+Discovery pages, accounts and password reset, My songs, upload, lyric entry and timing editors, rule-based clip generation, templates and preview, real MP4 export, the access gate (founder / first-song-free / paid), real multi-method payments, the watermark / resolution / premium-template value ladder, per-clip caption customization (font, size, style, position, word-by-word animation) with animated and audio-reactive backgrounds, the My clips library, share + caption helpers, the account area, the navigation shell, and an automated security suite running on every change.
 
 ### Small open items (not blockers)
 
@@ -333,6 +343,10 @@ Every commit, oldest to newest. Read top-to-bottom, this is the same story as Se
 | 2026-07-12 | Share + caption helpers (distribution) |
 | 2026-07-12 | Watermark + resolution value ladder (monetization) |
 | 2026-07-12 | Premium templates gated to paid access |
+| 2026-07-13 | Font fidelity + per-clip font/size customization (aesthetics S1) |
+| 2026-07-13 | Scroll-stopping caption presets: outline, lower-third, word-pop (S2) |
+| 2026-07-13 | Animated + audio-reactive waveform backgrounds (S3) |
+| 2026-07-13 | Consolidated per-clip Customize panel (S4) |
 
 ## Appendix B.  Technical reference (for engineers)
 
