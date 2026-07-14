@@ -79,8 +79,32 @@ export async function transcribeLyrics(songId: string) {
     end_ms: line.end_ms,
   }));
 
-  const { error: insertError } = await supabase.from("lyrics").insert(rows);
+  const { data: inserted, error: insertError } = await supabase
+    .from("lyrics")
+    .insert(rows)
+    .select("id, line_index");
   if (insertError) throw new Error(`Could not save lyrics: ${insertError.message}`);
+
+  // Persist per-word timing where Whisper provided it (aesthetics v1.3). The
+  // old lines were just deleted, so their words cascaded away. Word insert is
+  // non-fatal: captions fall back to the even split if it fails, so a word
+  // hiccup never blocks a successful transcription.
+  const byIndex = new Map((inserted ?? []).map((r) => [r.line_index, r.id]));
+  const wordRows = lines.flatMap((line, index) => {
+    const lyricId = byIndex.get(index);
+    if (!lyricId || !line.words) return [];
+    return line.words.map((w, wordIndex) => ({
+      lyric_id: lyricId,
+      user_id: user.id,
+      word_index: wordIndex,
+      text: w.text,
+      start_ms: w.start_ms,
+      end_ms: w.end_ms,
+    }));
+  });
+  if (wordRows.length > 0) {
+    await supabase.from("lyric_words").insert(wordRows);
+  }
 
   revalidatePath(`/songs/${songId}`);
 }
@@ -101,6 +125,10 @@ export async function updateLyricTiming(
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", lyricId);
   if (error) throw new Error(`Could not update line: ${error.message}`);
+
+  // A hand-retimed line's Whisper word times are now stale — drop them so
+  // captions fall back to the even split rather than mis-syncing (v1.3).
+  await supabase.from("lyric_words").delete().eq("lyric_id", lyricId);
 
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
 }
@@ -128,6 +156,12 @@ export async function bulkUpdateLyricTimings(
       .eq("id", u.id);
     if (error) throw new Error(`Could not save timing: ${error.message}`);
   }
+
+  // Retimed lines' Whisper word times are stale — drop them (v1.3).
+  await supabase
+    .from("lyric_words")
+    .delete()
+    .in("lyric_id", updates.map((u) => u.id));
 
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
 }

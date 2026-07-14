@@ -75,13 +75,24 @@ function scoreWindow(
   return Math.min(1, score);
 }
 
-export type PreviewLine = { text: string; offsetSeconds: number };
+export type PreviewWord = { text: string; offsetSeconds: number };
+export type PreviewLine = {
+  text: string;
+  offsetSeconds: number;
+  // Per-word timing relative to the segment start, when the lyric carries real
+  // word timing (lyric_words). Consumed for vocal-synced captions; absent =
+  // even split. Passed through here so render/preview share the same source.
+  words?: PreviewWord[];
+};
 
 /**
  * Recovers which lyric lines fall inside a segment's [start_ms, end_ms)
  * window, with each line's offset relative to the segment start — the
  * same windowing queueExport uses to build burned-in captions, reused
  * here so the live preview shows exactly what the export will render.
+ *
+ * timeLines preserves the input order 1:1, so timed[i] corresponds to
+ * lyrics[i] — that's how each in-window line recovers its real word timing.
  */
 export function linesForSegment(
   lyrics: Lyric[],
@@ -89,16 +100,26 @@ export function linesForSegment(
   segment: { start_ms: number; end_ms: number; label: string },
 ): PreviewLine[] {
   const timed = timeLines(lyrics, durationSeconds);
-  const linesInWindow = timed.filter(
-    (l) => l.start_ms < segment.end_ms && l.end_ms > segment.start_ms,
-  );
-  if (linesInWindow.length === 0) {
+  const result: PreviewLine[] = [];
+  for (let i = 0; i < timed.length; i++) {
+    const l = timed[i];
+    if (l.start_ms < segment.end_ms && l.end_ms > segment.start_ms) {
+      const words = lyrics[i]?.words
+        ?.map((w) => ({
+          text: w.text,
+          offsetSeconds: Math.max(0, (w.start_ms - segment.start_ms) / 1000),
+        }));
+      result.push({
+        text: l.text,
+        offsetSeconds: Math.max(0, (l.start_ms - segment.start_ms) / 1000),
+        words: words && words.length ? words : undefined,
+      });
+    }
+  }
+  if (result.length === 0) {
     return [{ text: segment.label, offsetSeconds: 0 }];
   }
-  return linesInWindow.map((l) => ({
-    text: l.text,
-    offsetSeconds: Math.max(0, (l.start_ms - segment.start_ms) / 1000),
-  }));
+  return result;
 }
 
 function assignPlatform(durationMs: number): GeneratedSegment["platform"] {

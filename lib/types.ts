@@ -9,6 +9,17 @@ export type Song = {
   created_at: string;
 };
 
+export type LyricWord = {
+  id: string;
+  lyric_id: string;
+  user_id: string | null;
+  word_index: number;
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  created_at: string;
+};
+
 export type Lyric = {
   id: string;
   user_id: string | null;
@@ -22,6 +33,10 @@ export type Lyric = {
   // rendered clip has gone stale relative to a later lyric edit. Optional so
   // the app still type-checks/degrades if the 0011 column isn't present yet.
   updated_at?: string;
+  // Per-word timing (from lyric_words, migration 0015), attached by callers
+  // that fetch it; drives vocal-synced captions. Absent = fall back to the
+  // even word split.
+  words?: { text: string; start_ms: number; end_ms: number }[];
 };
 
 export type VideoTemplate = {

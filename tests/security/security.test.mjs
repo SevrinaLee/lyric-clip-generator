@@ -521,6 +521,95 @@ describe("7. Per-clip caption preset columns (0013)", () => {
   });
 });
 
+// ── 8. PER-WORD TIMING (migration 0015) ────────────────────────────────────
+// lyric_words carries per-word timestamps, owner-scoped like lyrics. Assert
+// other users/anon can't read or write A's words, and that deleting A's lyric
+// cascades its words away (the invalidation the render relies on).
+describe("8. Per-word timing rows (0015)", () => {
+  let lyricId;
+  let wordId;
+
+  before(async () => {
+    const { data: lyric, error } = await ctx.a.client
+      .from("lyrics")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        line_index: 0,
+        text: "hello world",
+        start_ms: 1000,
+        end_ms: 2000,
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A inserts own lyric");
+    lyricId = lyric.id;
+
+    const { data: word, error: wErr } = await ctx.a.client
+      .from("lyric_words")
+      .insert({
+        lyric_id: lyricId,
+        user_id: ctx.a.user.id,
+        word_index: 0,
+        text: "hello",
+        start_ms: 1000,
+        end_ms: 1400,
+      })
+      .select("id")
+      .single();
+    assert.equal(wErr, null, "positive control: A inserts own word");
+    wordId = word.id;
+  });
+
+  it("B cannot read A's words", async () => {
+    const { data } = await ctx.b.client
+      .from("lyric_words")
+      .select("*")
+      .eq("id", wordId);
+    assert.equal(data?.length ?? 0, 0, "RLS hides A's words from B");
+  });
+
+  it("B cannot insert a word onto A's lyric", async () => {
+    const { error } = await ctx.b.client.from("lyric_words").insert({
+      lyric_id: lyricId,
+      user_id: ctx.b.user.id,
+      word_index: 1,
+      text: "sneaky",
+      start_ms: 0,
+      end_ms: 100,
+    });
+    // Either RLS blocks it, or the row is orphaned under B — assert A's word
+    // set is unchanged from the admin's view.
+    const { data: check } = await admin
+      .from("lyric_words")
+      .select("text")
+      .eq("lyric_id", lyricId);
+    assert.ok(
+      !check.some((w) => w.text === "sneaky") || !!error,
+      "B must not add a word to A's lyric",
+    );
+  });
+
+  it("anon cannot read words", async () => {
+    const anon = anonClient(env);
+    const { data } = await anon.from("lyric_words").select("*").eq("id", wordId);
+    assert.equal(data?.length ?? 0, 0, "anon sees no owned words");
+  });
+
+  it("deleting A's lyric cascades its words away", async () => {
+    const { error } = await ctx.a.client
+      .from("lyrics")
+      .delete()
+      .eq("id", lyricId);
+    assert.equal(error, null, "A deletes own lyric");
+    const { data: after } = await admin
+      .from("lyric_words")
+      .select("id")
+      .eq("lyric_id", lyricId);
+    assert.equal(after?.length ?? 0, 0, "words cascade-deleted with the lyric");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {
