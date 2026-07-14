@@ -50,10 +50,12 @@ const baseTemplate: VideoTemplate = {
 
 const lines = [{ text: "Neon city lights are calling", offsetSeconds: 0 }];
 
-const cases: { name: string; ov: Parameters<typeof resolveClipStyle>[1] }[] = [
-  { name: "box-center-fade", ov: { caption_font: "Montserrat ExtraBold", caption_size: "md", caption_style_preset: "box", caption_position: "center", caption_animation: "fade" } },
-  { name: "outline-lower-static", ov: { caption_font: "Anton", caption_size: "lg", caption_style_preset: "outline", caption_position: "lower", caption_animation: "fade" } },
-  { name: "yellow-lower-wordpop", ov: { caption_font: "Montserrat ExtraBold", caption_size: "lg", caption_style_preset: "outline-yellow", caption_position: "lower", caption_animation: "wordpop" } },
+const cases: { name: string; bg: string; ov: Parameters<typeof resolveClipStyle>[1] }[] = [
+  { name: "box-center-fade", bg: "solid", ov: { caption_font: "Montserrat ExtraBold", caption_size: "md", caption_style_preset: "box", caption_position: "center", caption_animation: "fade" } },
+  { name: "outline-lower-static", bg: "solid", ov: { caption_font: "Anton", caption_size: "lg", caption_style_preset: "outline", caption_position: "lower", caption_animation: "fade" } },
+  { name: "yellow-lower-wordpop", bg: "solid", ov: { caption_font: "Montserrat ExtraBold", caption_size: "lg", caption_style_preset: "outline-yellow", caption_position: "lower", caption_animation: "wordpop" } },
+  { name: "waveform-lower", bg: "waveform:#1a0f30:#8b7cff", ov: { caption_font: "Montserrat ExtraBold", caption_size: "lg", caption_style_preset: "outline", caption_position: "lower", caption_animation: "wordpop" } },
+  { name: "pulse-center", bg: "pulse:#ff6b9d:#4a2f7a", ov: { caption_font: "Anton", caption_size: "lg", caption_style_preset: "outline", caption_position: "center", caption_animation: "fade" } },
 ];
 
 for (const c of cases) {
@@ -61,12 +63,12 @@ for (const c of cases) {
   const mp4 = await renderClip({
     audioUrl, startMs: 0, endMs: 6000, lines,
     primaryColor: baseTemplate.primary_color,
-    backgroundStyle: baseTemplate.background_style,
+    backgroundStyle: c.bg,
     caption: style.ass,
     width: 1080, height: 1920,
   });
   writeFileSync(path.join(outDir, c.name + ".mp4"), mp4);
-  console.log("rendered", c.name, "(", style.ass.primary, "border", style.ass.borderStyle, "align", style.ass.alignment, ")");
+  console.log("rendered", c.name, "bg=" + c.bg);
 }
 
 server.close();

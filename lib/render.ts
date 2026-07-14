@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
-import { parseBackgroundStyle } from "./backgrounds";
+import { parseBackgroundStyle, darkenHex } from "./backgrounds";
 import { WORDPOP, wordSchedule, type AssCaptionStyle } from "./captionStyles";
 
 // Vendored copy of Next.js's bundled Noto Sans (SIL OFL) — see assets/fonts.
@@ -143,21 +143,63 @@ function run(cmd: string, args: string[]): Promise<void> {
 
 export type RenderLine = { text: string; offsetSeconds: number };
 
-// lavfi source for the video background. Solid templates keep the flat
-// color; gradient templates use the `gradients` source with a slow drift
-// (speed) so the backdrop feels alive without competing with the captions.
+// Resolves a background_style into the ffmpeg pieces the render needs:
+//  - lavfiInput: the `-f lavfi -i` source that becomes input [1]
+//  - filterChain: an optional filter_complex fragment turning [1:v] (and, for
+//    waveform, the audio) into a labelled [bg]; empty means use [1:v] directly
+//  - audioMap: the output audio stream (waveform must asplit so the same audio
+//    both drives the wave and is muxed out)
+type BackgroundSource = {
+  lavfiInput: string;
+  filterChain: string;
+  audioMap: string;
+};
+
 function backgroundSource(
   backgroundStyle: string | null | undefined,
   primaryColor: string,
   width: number,
   height: number,
-): string {
+): BackgroundSource {
   const bg = parseBackgroundStyle(backgroundStyle, primaryColor);
+  const size = `${width}x${height}`;
+
   if (bg.type === "gradient") {
-    return `gradients=s=${width}x${height}:c0=${bg.colors[0]}:c1=${bg.colors[1]}:x0=0:y0=0:x1=${width}:y1=${height}:speed=0.03`;
+    return {
+      lavfiInput: `gradients=s=${size}:c0=${bg.colors[0]}:c1=${bg.colors[1]}:x0=0:y0=0:x1=${width}:y1=${height}:speed=0.03`,
+      filterChain: "",
+      audioMap: "0:a",
+    };
   }
+
+  if (bg.type === "pulse") {
+    // Faster gradient drift + a gentle brightness "breath" (~2s period).
+    return {
+      lavfiInput: `gradients=s=${size}:c0=${bg.colors[0]}:c1=${bg.colors[1]}:x0=0:y0=0:x1=${width}:y1=${height}:speed=0.08`,
+      filterChain: `[1:v]eq=brightness=0.06*sin(t*PI):eval=frame[bg]`,
+      audioMap: "0:a",
+    };
+  }
+
+  if (bg.type === "waveform") {
+    const base = bg.colors[0];
+    const accent = bg.colors[1].replace("#", "0x"); // showwaves wants 0xRRGGBB
+    const waveH = Math.round(height * 0.36);
+    // asplit: one copy feeds showwaves, the other is muxed as the clip's audio.
+    // mode=line + draw=full keeps the accent colour crisp (cline washes out).
+    const filterChain =
+      `[0:a]asplit=2[aud][wsrc];` +
+      `[wsrc]showwaves=s=${width}x${waveH}:mode=line:colors=${accent}:rate=25:draw=full,format=yuva420p[w];` +
+      `[1:v][w]overlay=0:(H-h)/2[bg]`;
+    return {
+      lavfiInput: `gradients=s=${size}:c0=${base}:c1=${darkenHex(base, 0.4)}:speed=0.02`,
+      filterChain,
+      audioMap: "[aud]",
+    };
+  }
+
   const color = bg.color.startsWith("#") ? bg.color : `#${bg.color}`;
-  return `color=c=${color}:s=${width}x${height}`;
+  return { lavfiInput: `color=c=${color}:s=${size}`, filterChain: "", audioMap: "0:a" };
 }
 
 export async function renderClip({
@@ -210,6 +252,14 @@ export async function renderClip({
     // tier is smaller and slightly more compressed.
     const crf = width >= DESIGN_W ? "20" : "28";
 
+    const bgSrc = backgroundSource(backgroundStyle, primaryColor, width, height);
+    // Compose the (optional) background filter chain, then burn captions over
+    // whichever label carries the finished background.
+    const bgLabel = bgSrc.filterChain ? "[bg]" : "[1:v]";
+    const filterComplex =
+      (bgSrc.filterChain ? `${bgSrc.filterChain};` : "") +
+      `${bgLabel}ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`;
+
     await run(ffmpegPath, [
       "-y",
       "-ss", String(startSeconds),
@@ -217,10 +267,10 @@ export async function renderClip({
       "-i", sourcePath,
       "-f", "lavfi",
       "-t", String(durationSeconds),
-      "-i", backgroundSource(backgroundStyle, primaryColor, width, height),
-      "-filter_complex", `[1:v]ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`,
+      "-i", bgSrc.lavfiInput,
+      "-filter_complex", filterComplex,
       "-map", "[v]",
-      "-map", "0:a",
+      "-map", bgSrc.audioMap,
       "-c:v", "libx264",
       "-crf", crf,
       "-pix_fmt", "yuv420p",
