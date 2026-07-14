@@ -6,6 +6,7 @@ import type { AccessReason } from "@/lib/access";
 import { queueExport } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
+import { LooksRow } from "./LooksRow";
 import { ClipPreviewPlayer } from "./ClipPreviewPlayer";
 import { ClipStylePanel } from "./ClipStylePanel";
 import { SharePanel } from "./SharePanel";
@@ -169,6 +170,18 @@ function SegmentRow({
           </span>
         )}
       </div>
+
+      <LooksRow
+        segmentId={segment.id}
+        templates={templates}
+        selectedTemplateId={selectedTemplateId}
+        overrides={overrides}
+        paidTier={accessReason === "founder" || accessReason === "paid"}
+        onApply={(templateId, next) => {
+          setSelectedTemplateId(templateId);
+          setOverrides(next);
+        }}
+      />
 
       <TemplatePicker
         segmentId={segment.id}
