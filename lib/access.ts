@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 //   locked         — must pay
 export type AccessReason =
   | "founder"
+  | "subscriber"
   | "paid"
   | "free-song"
   | "free-eligible"
@@ -33,7 +34,8 @@ export type ExportTier = {
 };
 
 export function exportTier(reason: AccessReason): ExportTier {
-  const paid = reason === "founder" || reason === "paid";
+  const paid =
+    reason === "founder" || reason === "subscriber" || reason === "paid";
   return paid
     ? { label: "paid", watermark: false, width: 1080, height: 1920 }
     : { label: "free", watermark: true, width: 720, height: 1280 };
@@ -54,7 +56,7 @@ export async function evaluateSongAccess(
   if (!userId) return LOCKED;
 
   const supabase = await createClient();
-  const [{ data: profile }, { data: paid }] = await Promise.all([
+  const [{ data: profile }, { data: paid }, { data: subs }] = await Promise.all([
     supabase
       .from("profiles")
       .select("is_founder, free_song_id")
@@ -66,13 +68,37 @@ export async function evaluateSongAccess(
       .eq("song_id", songId)
       .eq("status", "paid")
       .limit(1),
+    supabase
+      .from("subscriptions")
+      .select("status, current_period_end")
+      .eq("user_id", userId)
+      .order("current_period_end", { ascending: false, nullsFirst: false })
+      .limit(1),
   ]);
 
   if (profile?.is_founder) return { unlocked: true, reason: "founder" };
+  // An active/trialing subscription unlocks EVERY song — the one check that
+  // lights up all premium gates (fonts, styles, formats, templates) via
+  // exportTier, with no per-feature wiring.
+  if (isSubscriptionActive(subs?.[0])) {
+    return { unlocked: true, reason: "subscriber" };
+  }
   if ((paid?.length ?? 0) > 0) return { unlocked: true, reason: "paid" };
   if (profile?.free_song_id === songId) return { unlocked: true, reason: "free-song" };
   if (!profile?.free_song_id) return { unlocked: true, reason: "free-eligible" };
   return LOCKED;
+}
+
+// Trust current_period_end over status alone: webhook events can arrive out of
+// order, so a subscription is "active" only if its status is active/trialing
+// AND it hasn't lapsed.
+function isSubscriptionActive(
+  sub: { status: string; current_period_end: string | null } | undefined,
+): boolean {
+  if (!sub) return false;
+  if (sub.status !== "active" && sub.status !== "trialing") return false;
+  if (!sub.current_period_end) return true;
+  return new Date(sub.current_period_end).getTime() > Date.now();
 }
 
 /**

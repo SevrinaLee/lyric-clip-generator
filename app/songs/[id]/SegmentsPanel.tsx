@@ -21,6 +21,7 @@ import {
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
+  subscriber: "★ Creator plan",
   "free-song": "✓ Your free song",
   "free-eligible": "✓ Free — uses your one free song",
 };

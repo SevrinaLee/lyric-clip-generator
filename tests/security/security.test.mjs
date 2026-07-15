@@ -679,6 +679,71 @@ describe("9. Export format column (0017)", () => {
   });
 });
 
+// ── 11. SUBSCRIPTIONS (migration 0019) ─────────────────────────────────────
+// The Creator subscription unlocks every song, so a client must NOT be able to
+// forge one. subscriptions is owner READ-ONLY; only the service-role webhook
+// writes it. Also assert the row's stripe_customer_id never leaks to B.
+describe("11. Subscriptions (0019)", () => {
+  const subId = `sub_test_${Date.now()}`;
+
+  before(async () => {
+    const { error } = await admin.from("subscriptions").insert({
+      id: subId,
+      user_id: ctx.a.user.id,
+      stripe_customer_id: "cus_SUB_SECRET_A",
+      status: "active",
+      current_period_end: new Date(Date.now() + 30 * 864e5).toISOString(),
+    });
+    assert.equal(error, null, "setup: service role creates a subscription");
+  });
+
+  it("A can read own subscription", async () => {
+    const { data } = await ctx.a.client
+      .from("subscriptions")
+      .select("status")
+      .eq("id", subId);
+    assert.equal(data?.length ?? 0, 1, "owner can see own subscription");
+  });
+
+  it("B cannot read A's subscription (nor its stripe_customer_id)", async () => {
+    const { data } = await ctx.b.client
+      .from("subscriptions")
+      .select("*")
+      .eq("id", subId);
+    assert.equal(data?.length ?? 0, 0, "RLS hides A's subscription from B");
+  });
+
+  it("a client cannot forge a subscription (no insert policy)", async () => {
+    const { data } = await ctx.b.client
+      .from("subscriptions")
+      .insert({
+        id: `sub_forged_${Date.now()}`,
+        user_id: ctx.b.user.id,
+        stripe_customer_id: "cus_forged",
+        status: "active",
+      })
+      .select();
+    assert.equal(data?.length ?? 0, 0, "client insert must be blocked");
+  });
+
+  it("a client cannot flip a subscription to active", async () => {
+    await ctx.a.client
+      .from("subscriptions")
+      .update({ status: "active", current_period_end: new Date(Date.now() + 864e8).toISOString() })
+      .eq("id", subId);
+    // (row is already active in setup; prove the client update path is denied
+    // by flipping it canceled via admin first, then trying to re-activate)
+    await admin.from("subscriptions").update({ status: "canceled" }).eq("id", subId);
+    await ctx.a.client.from("subscriptions").update({ status: "active" }).eq("id", subId);
+    const { data: check } = await admin
+      .from("subscriptions")
+      .select("status")
+      .eq("id", subId)
+      .single();
+    assert.equal(check.status, "canceled", "client update must not take effect");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

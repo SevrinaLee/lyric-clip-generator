@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       songTitle: song.title,
       paymentId: payment.id,
       songId,
+      userId: user.id,
       plan,
       successUrl: `${origin}/songs/${songId}?checkout=success`,
       cancelUrl: `${origin}/songs/${songId}?checkout=canceled`,

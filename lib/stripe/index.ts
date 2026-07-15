@@ -63,6 +63,7 @@ export async function createSongCheckoutSession({
   songTitle,
   paymentId,
   songId,
+  userId,
   plan,
   successUrl,
   cancelUrl,
@@ -70,6 +71,7 @@ export async function createSongCheckoutSession({
   songTitle: string;
   paymentId: string;
   songId: string;
+  userId: string;
   plan: "single" | "subscription";
   successUrl: string;
   cancelUrl: string;
@@ -100,7 +102,9 @@ export async function createSongCheckoutSession({
     ...(mode === "subscription"
       ? {
           subscription_data: {
-            metadata: { paymentId, songId },
+            // userId lets the subscription.* webhook map events to a user
+            // without depending on the customer→profile lookup existing yet.
+            metadata: { paymentId, songId, userId },
             ...(PLATFORM_FEE_PERCENT > 0
               ? { application_fee_percent: PLATFORM_FEE_PERCENT }
               : {}),

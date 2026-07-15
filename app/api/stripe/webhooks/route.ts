@@ -8,8 +8,10 @@ import type Stripe from "stripe";
  *
  * Register this URL in the Stripe dashboard → Webhooks → add endpoint →
  * /api/stripe/webhooks, subscribed to `checkout.session.completed`,
- * `checkout.session.async_payment_succeeded`, and
- * `checkout.session.async_payment_failed`.
+ * `checkout.session.async_payment_succeeded`,
+ * `checkout.session.async_payment_failed`, and — for the Creator plan —
+ * `customer.subscription.created`, `customer.subscription.updated`, and
+ * `customer.subscription.deleted`.
  *
  * Async events matter for PayNow/GrabPay: those sessions can emit
  * `completed` with payment_status "unpaid" and only confirm (or fail)
@@ -89,6 +91,45 @@ export async function POST(request: Request) {
           .from("payments")
           .update({ status: "failed" })
           .eq("id", paymentId);
+      }
+    } else if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.deleted"
+    ) {
+      // Creator subscription (v1.5): mirror the Stripe subscription into our
+      // subscriptions table so evaluateSongAccess can unlock every song. userId
+      // rides in the subscription metadata (set at checkout).
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = sub.metadata?.userId;
+      const customerId =
+        typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+      if (userId && customerId) {
+        await supabase.from("subscriptions").upsert(
+          {
+            id: sub.id,
+            user_id: userId,
+            stripe_customer_id: customerId,
+            // deleted → force a terminal status even if the object still reads
+            // "active" in the event payload.
+            status:
+              event.type === "customer.subscription.deleted"
+                ? "canceled"
+                : sub.status,
+            price_id: sub.items.data[0]?.price?.id ?? null,
+            current_period_end: sub.current_period_end
+              ? new Date(sub.current_period_end * 1000).toISOString()
+              : null,
+            cancel_at_period_end: sub.cancel_at_period_end ?? false,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" },
+        );
+        // Make sure the portal can find this customer even if the subscription
+        // event lands before checkout.session.completed.
+        await supabase
+          .from("profiles")
+          .upsert({ id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() });
       }
     }
   } catch (err) {
