@@ -223,6 +223,22 @@ caption); security test: B cannot call `updateSegmentWindow` on A's segment.
 **Goal:** renders survive cold starts, long clips, and slow formats; users see
 progress instead of a spinner praying against `maxDuration`.
 
+> **⛔ ATTEMPTED & DEFERRED (2026-07-15).** Built the `after()`-based async
+> pipeline (render_jobs table + progress polling) on a `render-pipeline` branch
+> and tested it on a Vercel **preview** deploy. It stalled: the export row was
+> created but the `after()` callback **never executed** (export stuck
+> `rendering`, no file, no job progress). Root cause: this project is on a
+> Vercel plan **without Fluid Compute**, so post-response background work
+> (`after()` / `waitUntil`) isn't kept alive long enough to finish a ~20–30s
+> encode. Production was never touched (branch not merged) — it keeps the
+> reliable **synchronous** render. Migration 0018 (`render_jobs`) is applied but
+> dormant. **To ship this, one of:** (a) upgrade to Vercel Pro + enable Fluid
+> Compute, then merge the `render-pipeline` branch; (b) use an external queue
+> (QStash / Vercel Queue) to re-invoke a worker route; (c) Supabase Edge
+> Function / cron worker. Synchronous render is fine meanwhile (clips ≤60s
+> encode well inside the 60s budget), so this is a UX/scale upgrade, not a
+> blocker — revisit when a heavy feature (6.3 video loops, long HD) needs it.
+
 - **Architecture decision — DB-backed job queue, no new infra:** a
   `render_jobs` table (migration 0018: id, export_id fk, user_id, status
   `queued|running|done|failed`, progress int, attempt int, created/started/
