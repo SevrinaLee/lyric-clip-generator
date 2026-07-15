@@ -12,6 +12,12 @@ import { ClipStylePanel } from "./ClipStylePanel";
 import { SharePanel } from "./SharePanel";
 import { resolveClipStyle, type ClipStyleOverrides } from "@/lib/captionStyles";
 import type { PreviewLine } from "@/lib/scoring";
+import {
+  FORMAT_PRESETS,
+  CLIP_FORMATS,
+  DEFAULT_FORMAT,
+  type ClipFormat,
+} from "@/lib/formats";
 
 const UNLOCK_LABEL: Partial<Record<AccessReason, string>> = {
   founder: "★ Founder access — free",
@@ -118,7 +124,9 @@ function SegmentRow({
     caption_style_preset: segment.caption_style_preset ?? null,
     caption_animation: segment.caption_animation ?? null,
   });
+  const [format, setFormat] = useState<ClipFormat>(DEFAULT_FORMAT);
 
+  const paidTier = accessReason === "founder" || accessReason === "paid";
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
   const clipStyle = selectedTemplate
     ? resolveClipStyle(selectedTemplate, overrides)
@@ -142,7 +150,7 @@ function SegmentRow({
     if (isFirst) setStatus("rendering");
     startTransition(async () => {
       try {
-        const result = await queueExport(segment.id);
+        const result = await queueExport(segment.id, format);
         setExportId(result.id);
         setStatus("done");
         setLocallyRenderedAt(new Date().toISOString());
@@ -226,6 +234,44 @@ function SegmentRow({
           </span>
         </p>
       )}
+
+      <div className="space-y-1">
+        <span className="block text-xs text-ink/50">Export format</span>
+        <div className="flex flex-wrap gap-1.5">
+          {CLIP_FORMATS.map((f) => {
+            const preset = FORMAT_PRESETS[f];
+            const locked = preset.isPremium && !paidTier;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  if (locked) {
+                    setError("This aspect ratio is premium — unlock this song.");
+                    return;
+                  }
+                  setError(null);
+                  setFormat(f);
+                }}
+                title={preset.hint}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  format === f
+                    ? "bg-ink text-cream"
+                    : "border border-ink/15 text-ink/70 hover:bg-ink/5"
+                }`}
+              >
+                {preset.label}
+                {locked ? " 🔒" : preset.isPremium ? " ★" : ""}
+              </button>
+            );
+          })}
+        </div>
+        {format !== DEFAULT_FORMAT && (
+          <p className="text-[11px] text-ink/40">
+            Preview shows 9:16; the export renders {format}.
+          </p>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {status !== "done" ? (

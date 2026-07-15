@@ -6,6 +6,7 @@ import {
   exportTier,
 } from "@/lib/access";
 import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
+import { isFormat, DEFAULT_FORMAT } from "@/lib/formats";
 import type { ClipSegment } from "@/lib/types";
 
 // Re-rendering a clean HD version on the first paid download can exceed the
@@ -30,13 +31,14 @@ export async function GET(
   // demo). maybeSingle returns null for someone else's export → 404.
   const { data: exportRow } = await supabase
     .from("exports")
-    .select("status, video_url, clip_segment_id, tier")
+    .select("status, video_url, clip_segment_id, tier, format")
     .eq("id", id)
     .maybeSingle<{
       status: string;
       video_url: string | null;
       clip_segment_id: string;
       tier: string | null;
+      format: string | null;
     }>();
 
   if (!exportRow || exportRow.status !== "done" || !exportRow.video_url) {
@@ -66,10 +68,11 @@ export async function GET(
     // Value ladder: if the stored file is the free (watermarked) tier but the
     // caller now has paid access, render a clean HD version once and cache it.
     const desired = exportTier((await evaluateSongAccess(user.id, segment.song_id)).reason);
+    const format = isFormat(exportRow.format) ? exportRow.format : DEFAULT_FORMAT;
     if (desired.label === "paid" && (exportRow.tier ?? "free") !== "paid") {
       try {
-        const buffer = await renderSegmentToBuffer(supabase, segment, desired);
-        const hdPath = exportStoragePath(id, desired);
+        const buffer = await renderSegmentToBuffer(supabase, segment, desired, format);
+        const hdPath = exportStoragePath(id, desired, format);
         const { error: upErr } = await supabase.storage
           .from("exports")
           .upload(hdPath, buffer, { contentType: "video/mp4", upsert: true });

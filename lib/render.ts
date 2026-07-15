@@ -16,12 +16,13 @@ const FONTS_DIR = path.join(process.cwd(), "assets/fonts");
 // caption's chosen font; captions use the family passed by the caller
 // (resolved via lib/captionStyles.ts from vendored TTFs in assets/fonts).
 const FONT_FAMILY = "Noto Sans";
-// Caption layout is authored in this fixed 1080x1920 design space (ass
-// PlayResX/Y); libass scales it to whatever output resolution we render at,
-// so the free (720x1280) and paid (1080x1920) tiers look identical apart
-// from sharpness.
+// Caption layout is authored at a fixed reference HEIGHT (REF_H); PlayResX is
+// derived from the output aspect so the design space always matches the output
+// aspect (no distortion) and font sizes / margins stay consistent across
+// formats and tiers — libass just scales the reference to the actual output.
 const DESIGN_W = 1080;
 const DESIGN_H = 1920;
+const REF_H = 1920;
 const WATERMARK_TEXT = "made with Lyric Clip Generator";
 
 // ffmpeg-static's prebuilt linux binary (johnvansickle.com) does not compile
@@ -101,14 +102,16 @@ function buildAssSubtitle(
   durationSeconds: number,
   watermark: boolean,
   cap: AssCaptionStyle,
+  playResX: number,
+  playResY: number,
 ): string {
   // Watermark style: bottom-centre (Alignment 2), small, ~60% opacity white
   // with a soft outline so it stays legible over any background. The caption
   // (Default) style is driven by the resolved per-clip style.
   const header = `[Script Info]
 ScriptType: v4.00+
-PlayResX: ${DESIGN_W}
-PlayResY: ${DESIGN_H}
+PlayResX: ${playResX}
+PlayResY: ${playResY}
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
@@ -278,9 +281,13 @@ export async function renderClip({
     const durationSeconds = (endMs - startMs) / 1000;
     const startSeconds = startMs / 1000;
 
+    // Author captions at the reference height with an aspect-matched width, so
+    // the same font sizes/margins work for any output format.
+    const playResY = REF_H;
+    const playResX = Math.round((REF_H * width) / height);
     await writeFile(
       assPath,
-      buildAssSubtitle(lines, durationSeconds, watermark, caption),
+      buildAssSubtitle(lines, durationSeconds, watermark, caption, playResX, playResY),
     );
 
     const assFilterPath = escapeFilterPath(assPath);

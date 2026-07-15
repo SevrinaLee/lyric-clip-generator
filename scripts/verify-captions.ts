@@ -11,6 +11,7 @@ import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import { renderClip } from "../lib/render";
 import { resolveClipStyle } from "../lib/captionStyles";
+import { CLIP_FORMATS, renderDimensions } from "../lib/formats";
 import type { VideoTemplate } from "../lib/types";
 
 const outDir = process.argv[2] ?? mkdtempSync(path.join(tmpdir(), "capout-"));
@@ -88,6 +89,25 @@ for (const c of cases) {
   });
   writeFileSync(path.join(outDir, c.name + ".mp4"), mp4);
   console.log("rendered", c.name, "anim=" + style.ass.animation);
+}
+
+// v1.4 S4.1 — format matrix: each aspect ratio with a lower-third outline
+// caption over a waveform bg, to confirm no distortion + correct margins.
+const fmtStyle = resolveClipStyle(baseTemplate, {
+  caption_font: "Montserrat ExtraBold", caption_size: "lg",
+  caption_style_preset: "outline", caption_position: "lower", caption_animation: "fade",
+} as never);
+for (const f of CLIP_FORMATS) {
+  const d = renderDimensions(f, true);
+  const mp4 = await renderClip({
+    audioUrl, startMs: 0, endMs: 6000, lines,
+    primaryColor: baseTemplate.primary_color,
+    backgroundStyle: "waveform:#1a0f30:#8b7cff",
+    caption: fmtStyle.ass,
+    width: d.width, height: d.height,
+  });
+  writeFileSync(path.join(outDir, "fmt-" + f.replace(":", "x") + ".mp4"), mp4);
+  console.log("rendered format", f, `${d.width}x${d.height}`);
 }
 
 server.close();

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { linesForSegment, attachWordTiming } from "./scoring";
 import { renderClip } from "./render";
 import { resolveClipStyle } from "./captionStyles";
+import { renderDimensions, formatSlug, DEFAULT_FORMAT, type ClipFormat } from "./formats";
 import type { ExportTier } from "./access";
 import type { ClipSegment, Lyric, LyricWord, Song, VideoTemplate } from "./types";
 
@@ -12,6 +13,7 @@ export async function renderSegmentToBuffer(
   supabase: SupabaseClient,
   segment: ClipSegment,
   tier: ExportTier,
+  format: ClipFormat = DEFAULT_FORMAT,
 ): Promise<Buffer> {
   if (!segment.template_id) throw new Error("Pick a template first");
 
@@ -51,6 +53,7 @@ export async function renderSegmentToBuffer(
   // browser preview shows, so exports match the preview (font, size, style
   // preset, position, animation).
   const style = resolveClipStyle(template, segment);
+  const dims = renderDimensions(format, tier.label === "paid");
   return renderClip({
     audioUrl: song.audio_url,
     startMs: segment.start_ms,
@@ -59,14 +62,24 @@ export async function renderSegmentToBuffer(
     primaryColor: template.primary_color,
     backgroundStyle: template.background_style,
     watermark: tier.watermark,
-    width: tier.width,
-    height: tier.height,
+    width: dims.width,
+    height: dims.height,
     caption: style.ass,
   });
 }
 
-// Storage path for an export at a given tier. The paid (HD, watermark-free)
-// render lives at a separate path so upgrading never clobbers the free file.
-export function exportStoragePath(exportId: string, tier: ExportTier): string {
-  return tier.label === "paid" ? `${exportId}-hd.mp4` : `${exportId}.mp4`;
+// Storage path for an export at a given tier + format. The paid (HD,
+// watermark-free) render lives at a separate path so upgrading never clobbers
+// the free file. 9:16 keeps its original path (no format suffix) for backward
+// compatibility with pre-4.1 exports; other formats get a slug so they never
+// collide.
+export function exportStoragePath(
+  exportId: string,
+  tier: ExportTier,
+  format: ClipFormat = DEFAULT_FORMAT,
+): string {
+  const fmt = format === DEFAULT_FORMAT ? "" : `-${formatSlug(format)}`;
+  return tier.label === "paid"
+    ? `${exportId}${fmt}-hd.mp4`
+    : `${exportId}${fmt}.mp4`;
 }

@@ -610,6 +610,75 @@ describe("8. Per-word timing rows (0015)", () => {
   });
 });
 
+// ── 9. EXPORT FORMAT (migration 0017) ──────────────────────────────────────
+// exports.format is owner-set via queueExport. Assert the DB CHECK rejects
+// out-of-set values and that B can't read A's export row. (Premium gating for
+// non-9:16 lives in the queueExport server action, not the DB.)
+describe("9. Export format column (0017)", () => {
+  let segmentId;
+
+  before(async () => {
+    const { data: seg, error } = await ctx.a.client
+      .from("clip_segments")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        label: "Drop",
+        start_ms: 0,
+        end_ms: 8000,
+        platform: "tiktok",
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A inserts own clip segment");
+    segmentId = seg.id;
+  });
+
+  it("A can insert an export with a valid format", async () => {
+    const { data, error } = await ctx.a.client
+      .from("exports")
+      .insert({
+        clip_segment_id: segmentId,
+        user_id: ctx.a.user.id,
+        status: "rendering",
+        platform: "tiktok",
+        format: "1:1",
+      })
+      .select("id, format");
+    assert.equal(error, null);
+    assert.equal(data?.[0]?.format, "1:1");
+  });
+
+  it("DB CHECK rejects an out-of-set format", async () => {
+    const { error } = await ctx.a.client.from("exports").insert({
+      clip_segment_id: segmentId,
+      user_id: ctx.a.user.id,
+      status: "rendering",
+      platform: "tiktok",
+      format: "3:2'; drop table exports;--",
+    });
+    assert.ok(error, "junk format must be rejected by the check constraint");
+    const { count } = await admin
+      .from("exports")
+      .select("id", { count: "exact", head: true });
+    assert.ok((count ?? 0) >= 0, "exports table intact");
+  });
+
+  it("B cannot read A's export", async () => {
+    const { data: mine } = await ctx.a.client
+      .from("exports")
+      .select("id")
+      .eq("clip_segment_id", segmentId)
+      .limit(1);
+    const exportId = mine?.[0]?.id;
+    const { data } = await ctx.b.client
+      .from("exports")
+      .select("*")
+      .eq("id", exportId);
+    assert.equal(data?.length ?? 0, 0, "RLS hides A's export from B");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

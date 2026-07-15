@@ -96,4 +96,7 @@ export type Export = {
   video_url: string | null;
   payment_id: string | null;
   created_at: string;
+  // Aspect ratio of this export (migration 0017); 9:16 default. Optional-
+  // tolerant so the app degrades before the column exists.
+  format?: "9:16" | "1:1" | "4:5" | "16:9";
 };

@@ -13,6 +13,7 @@ import {
   isAnimationPremium,
   type CaptionAnimation,
 } from "@/lib/captionStyles";
+import { isFormat, isFormatPremium, DEFAULT_FORMAT } from "@/lib/formats";
 import { transcribeAudio } from "@/lib/whisper";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
 
@@ -386,12 +387,14 @@ export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdat
   revalidatePath(`/songs/${segment.song_id}`);
 }
 
-export async function queueExport(segmentId: string) {
+export async function queueExport(segmentId: string, format: string = DEFAULT_FORMAT) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("You must be logged in to export a clip");
+
+  if (!isFormat(format)) throw new Error("Unknown format");
 
   const { data: segment } = await supabase
     .from("clip_segments")
@@ -407,6 +410,12 @@ export async function queueExport(segmentId: string) {
   const access = await evaluateSongAccess(user.id, segment.song_id);
   const tier = exportTier(access.reason);
 
+  // Non-9:16 aspect ratios are premium — gate server-side (the picker UI
+  // mirrors this but is never trusted).
+  if (isFormatPremium(format) && tier.label !== "paid") {
+    throw new Error("This aspect ratio is premium — unlock this song to export it.");
+  }
+
   const { data: exportRow, error: insertError } = await supabase
     .from("exports")
     .insert({
@@ -414,6 +423,7 @@ export async function queueExport(segmentId: string) {
       user_id: user.id,
       status: "rendering",
       platform: segment.platform,
+      format,
     })
     .select("id")
     .single();
@@ -424,9 +434,9 @@ export async function queueExport(segmentId: string) {
   revalidatePath(`/songs/${segment.song_id}`);
 
   try {
-    const videoBuffer = await renderSegmentToBuffer(supabase, segment, tier);
+    const videoBuffer = await renderSegmentToBuffer(supabase, segment, tier, format);
 
-    const path = exportStoragePath(exportRow.id, tier);
+    const path = exportStoragePath(exportRow.id, tier, format);
     const { error: uploadError } = await supabase.storage
       .from("exports")
       .upload(path, videoBuffer, { contentType: "video/mp4", upsert: true });
