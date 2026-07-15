@@ -75,6 +75,16 @@ export type ClipSegment = {
   created_at: string;
 };
 
+export type BrandKit = {
+  user_id: string;
+  display_name: string | null;
+  accent_hex: string | null;
+  watermark_text: string | null;
+  logo_path: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Subscription = {
   id: string;
   user_id: string;

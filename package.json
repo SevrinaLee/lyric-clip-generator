@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:security": "node --test \"tests/security/**/*.test.mjs\"",
     "verify:captions": "tsx scripts/verify-captions.ts",
-    "verify:words": "tsx scripts/verify-words.ts"
+    "verify:words": "tsx scripts/verify-words.ts",
+    "verify:brand": "tsx scripts/verify-brand.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",

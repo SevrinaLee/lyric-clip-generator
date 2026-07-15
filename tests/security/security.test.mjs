@@ -744,6 +744,48 @@ describe("11. Subscriptions (0019)", () => {
   });
 });
 
+// ── 12. BRAND KITS (migration 0020) ────────────────────────────────────────
+// A premium brand kit brands paid exports, so isolation matters: a user must
+// only ever read/write their OWN kit. (Logo-file type sniffing is a pure
+// function tested by scripts/verify-brand.ts.)
+describe("12. Brand kits (0020)", () => {
+  before(async () => {
+    const { error } = await ctx.a.client
+      .from("brand_kits")
+      .upsert({ user_id: ctx.a.user.id, watermark_text: "@alice", accent_hex: "#00e5ff" });
+    assert.equal(error, null, "positive control: A saves own brand kit");
+  });
+
+  it("B cannot read A's brand kit", async () => {
+    const { data } = await ctx.b.client
+      .from("brand_kits")
+      .select("*")
+      .eq("user_id", ctx.a.user.id);
+    assert.equal(data?.length ?? 0, 0, "RLS hides A's brand kit from B");
+  });
+
+  it("B cannot write a brand kit for A", async () => {
+    await ctx.b.client
+      .from("brand_kits")
+      .upsert({ user_id: ctx.a.user.id, watermark_text: "hacked by B" });
+    const { data: check } = await admin
+      .from("brand_kits")
+      .select("watermark_text")
+      .eq("user_id", ctx.a.user.id)
+      .single();
+    assert.equal(check.watermark_text, "@alice", "A's kit must be unchanged");
+  });
+
+  it("anon cannot read brand kits", async () => {
+    const anon = anonClient(env);
+    const { data } = await anon
+      .from("brand_kits")
+      .select("*")
+      .eq("user_id", ctx.a.user.id);
+    assert.equal(data?.length ?? 0, 0, "anon sees no brand kits");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

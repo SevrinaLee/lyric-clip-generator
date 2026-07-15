@@ -23,7 +23,7 @@ const FONT_FAMILY = "Noto Sans";
 const DESIGN_W = 1080;
 const DESIGN_H = 1920;
 const REF_H = 1920;
-const WATERMARK_TEXT = "made with Lyric Clip Generator";
+export const WATERMARK_TEXT = "made with Lyric Clip Generator";
 
 // ffmpeg-static's prebuilt linux binary (johnvansickle.com) does not compile
 // in the "drawtext" filter, even though its configure flags list
@@ -100,7 +100,7 @@ function karaokeEventText(line: RenderLine, lineDurationSeconds: number): string
 function buildAssSubtitle(
   lines: RenderLine[],
   durationSeconds: number,
-  watermark: boolean,
+  watermarkText: string | null,
   cap: AssCaptionStyle,
   playResX: number,
   playResY: number,
@@ -149,8 +149,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     })
     .join("\n");
 
-  const watermarkEvent = watermark
-    ? `\nDialogue: 1,${formatAssTime(0)},${formatAssTime(durationSeconds)},Watermark,,0,0,0,,${WATERMARK_TEXT}`
+  const watermarkEvent = watermarkText
+    ? `\nDialogue: 1,${formatAssTime(0)},${formatAssTime(durationSeconds)},Watermark,,0,0,0,,${escapeAssText(watermarkText)}`
     : "";
 
   return header + events + watermarkEvent + "\n";
@@ -200,6 +200,7 @@ function backgroundSource(
   primaryColor: string,
   width: number,
   height: number,
+  brandAccent?: string | null,
 ): BackgroundSource {
   const bg = parseBackgroundStyle(backgroundStyle, primaryColor);
   const size = `${width}x${height}`;
@@ -223,7 +224,10 @@ function backgroundSource(
 
   if (bg.type === "waveform") {
     const base = bg.colors[0];
-    const accent = bg.colors[1].replace("#", "0x"); // showwaves wants 0xRRGGBB
+    // Brand-kit accent overrides the wave colour when set (paid renders).
+    const accentHex =
+      brandAccent && /^#[0-9a-fA-F]{6}$/.test(brandAccent) ? brandAccent : bg.colors[1];
+    const accent = accentHex.replace("#", "0x"); // showwaves wants 0xRRGGBB
     const waveH = Math.round(height * 0.36);
     // asplit: one copy feeds showwaves, the other is muxed as the clip's audio.
     // mode=line + draw=full keeps the accent colour crisp (cline washes out).
@@ -250,7 +254,9 @@ export async function renderClip({
   primaryColor,
   caption,
   backgroundStyle,
-  watermark = false,
+  watermarkText = null,
+  logoBuffer = null,
+  brandAccent = null,
   width = DESIGN_W,
   height = DESIGN_H,
 }: {
@@ -262,7 +268,14 @@ export async function renderClip({
   /** Resolved caption style (font, size, preset, position, animation) */
   caption: AssCaptionStyle;
   backgroundStyle?: string | null;
-  watermark?: boolean;
+  /** Bottom-centre watermark text (free-tier growth mark OR a brand kit's
+   *  text); null = none. */
+  watermarkText?: string | null;
+  /** Optional brand logo (PNG/JPEG), overlaid bottom-right on paid renders. */
+  logoBuffer?: Buffer | null;
+  /** Brand accent (#rrggbb) — overrides waveform colour; caption fill is
+   *  handled by the resolved `caption`. */
+  brandAccent?: string | null;
   width?: number;
   height?: number;
 }): Promise<Buffer> {
@@ -272,6 +285,7 @@ export async function renderClip({
   const sourcePath = path.join(dir, "source");
   const outPath = path.join(dir, "out.mp4");
   const assPath = path.join(dir, "captions.ass");
+  const logoPath = path.join(dir, "logo.img");
 
   try {
     const res = await fetch(audioUrl);
@@ -287,7 +301,7 @@ export async function renderClip({
     const playResX = Math.round((REF_H * width) / height);
     await writeFile(
       assPath,
-      buildAssSubtitle(lines, durationSeconds, watermark, caption, playResX, playResY),
+      buildAssSubtitle(lines, durationSeconds, watermarkText, caption, playResX, playResY),
     );
 
     const assFilterPath = escapeFilterPath(assPath);
@@ -296,24 +310,39 @@ export async function renderClip({
     // tier is smaller and slightly more compressed.
     const crf = width >= DESIGN_W ? "20" : "28";
 
-    const bgSrc = backgroundSource(backgroundStyle, primaryColor, width, height);
+    const bgSrc = backgroundSource(backgroundStyle, primaryColor, width, height, brandAccent);
     // Compose the (optional) background filter chain, then burn captions over
     // whichever label carries the finished background.
     const bgLabel = bgSrc.filterChain ? "[bg]" : "[1:v]";
-    const filterComplex =
+    let filterComplex =
       (bgSrc.filterChain ? `${bgSrc.filterChain};` : "") +
       `${bgLabel}ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`;
 
-    await run(ffmpegPath, [
-      "-y",
+    const inputs = [
       "-ss", String(startSeconds),
       "-t", String(durationSeconds),
       "-i", sourcePath,
       "-f", "lavfi",
       "-t", String(durationSeconds),
       "-i", bgSrc.lavfiInput,
+    ];
+
+    // Brand logo (paid renders): scale to ~8% of the output height and overlay
+    // bottom-right. The logo is input [2]; captions are already burned into [v].
+    let videoLabel = "[v]";
+    if (logoBuffer) {
+      await writeFile(logoPath, logoBuffer);
+      inputs.push("-i", logoPath);
+      const logoH = Math.round(height * 0.08);
+      filterComplex += `;[2:v]scale=-1:${logoH}[lg];[v][lg]overlay=W-w-40:H-h-40[out]`;
+      videoLabel = "[out]";
+    }
+
+    await run(ffmpegPath, [
+      "-y",
+      ...inputs,
       "-filter_complex", filterComplex,
-      "-map", "[v]",
+      "-map", videoLabel,
       "-map", bgSrc.audioMap,
       "-c:v", "libx264",
       "-crf", crf,

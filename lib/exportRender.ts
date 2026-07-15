@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { linesForSegment, attachWordTiming } from "./scoring";
-import { renderClip } from "./render";
+import { renderClip, WATERMARK_TEXT } from "./render";
 import { resolveClipStyle } from "./captionStyles";
 import { renderDimensions, formatSlug, DEFAULT_FORMAT, type ClipFormat } from "./formats";
 import type { ExportTier } from "./access";
-import type { ClipSegment, Lyric, LyricWord, Song, VideoTemplate } from "./types";
+import type { BrandKit, ClipSegment, Lyric, LyricWord, Song, VideoTemplate } from "./types";
 
 // Gathers a segment's render inputs and produces the MP4 at the given tier.
 // Shared by queueExport (initial render) and the download route (lazy
@@ -49,10 +49,35 @@ export async function renderSegmentToBuffer(
   const timedLyrics = attachWordTiming(lyrics ?? [], words ?? []);
 
   const renderLines = linesForSegment(timedLyrics, song.duration_seconds, segment);
-  // Template defaults + per-clip overrides → the same effective style the
-  // browser preview shows, so exports match the preview (font, size, style
-  // preset, position, animation).
-  const style = resolveClipStyle(template, segment);
+
+  // Brand kit (v1.5 S5.3) applies on PAID renders only: a subscriber's custom
+  // watermark text, logo overlay, and accent colour. Free renders keep the
+  // "made with" growth watermark and no branding.
+  let brand: BrandKit | null = null;
+  if (tier.label === "paid" && segment.user_id) {
+    const { data } = await supabase
+      .from("brand_kits")
+      .select("*")
+      .eq("user_id", segment.user_id)
+      .maybeSingle<BrandKit>();
+    brand = data ?? null;
+  }
+
+  const watermarkText = tier.watermark
+    ? WATERMARK_TEXT
+    : (brand?.watermark_text?.trim() || null);
+
+  let logoBuffer: Buffer | null = null;
+  if (brand?.logo_path) {
+    const { data: blob } = await supabase.storage
+      .from("brand-logos")
+      .download(brand.logo_path);
+    if (blob) logoBuffer = Buffer.from(await blob.arrayBuffer());
+  }
+
+  // Template defaults + per-clip overrides (+ brand accent) → the same
+  // effective style the browser preview shows.
+  const style = resolveClipStyle(template, segment, brand?.accent_hex);
   const dims = renderDimensions(format, tier.label === "paid");
   return renderClip({
     audioUrl: song.audio_url,
@@ -61,7 +86,9 @@ export async function renderSegmentToBuffer(
     lines: renderLines,
     primaryColor: template.primary_color,
     backgroundStyle: template.background_style,
-    watermark: tier.watermark,
+    watermarkText,
+    logoBuffer,
+    brandAccent: brand?.accent_hex ?? null,
     width: dims.width,
     height: dims.height,
     caption: style.ass,

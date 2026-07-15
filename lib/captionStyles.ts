@@ -157,6 +157,13 @@ export const KARAOKE_UNSUNG = "&H00808080";
 // fade-in instead.
 export const WORDPOP = { revealMs: 50, popInMs: 140, settleMs: 140, scalePct: 130 };
 
+// #rrggbb → ASS &H00BBGGRR (used for the brand-kit accent override).
+export function hexToAss(hex: string): string {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return "&H00FFFFFF";
+  return `&H00${h.slice(4, 6)}${h.slice(2, 4)}${h.slice(0, 2)}`.toUpperCase();
+}
+
 export function splitWords(text: string): string[] {
   return text.trim().split(/\s+/).filter(Boolean);
 }
@@ -257,6 +264,7 @@ function normalizeAnimation(raw: string | null | undefined): CaptionAnimation {
 export function resolveClipStyle(
   template: Pick<VideoTemplate, "font" | "animation_preset">,
   segment?: StyleSegment | null,
+  brandAccent?: string | null,
 ): ResolvedClipStyle {
   const requestedFont = segment?.caption_font ?? template.font;
   const fontName = requestedFont in FONT_REGISTRY ? requestedFont : FALLBACK_FONT;
@@ -285,6 +293,12 @@ export function resolveClipStyle(
   const pos = POSITION_PRESETS[position];
   const preset = STYLE_PRESETS[stylePreset];
 
+  // Brand-kit accent overrides the yellow-emphasis fill (paid renders only).
+  const validAccent = brandAccent && /^#[0-9a-fA-F]{6}$/.test(brandAccent);
+  const useAccent = validAccent && stylePreset === "outline-yellow";
+  const primaryAss = useAccent ? hexToAss(brandAccent!) : preset.primary;
+  const primaryPreview = useAccent ? brandAccent! : preset.previewColor;
+
   return {
     fontName,
     font,
@@ -295,7 +309,7 @@ export function resolveClipStyle(
     ass: {
       fontFamily: font.assFamily,
       fontSize: sz.assFontSize,
-      primary: preset.primary,
+      primary: primaryAss,
       // Only karaoke uses SecondaryColour (the \k unsung fill); harmless otherwise.
       secondary: animation === "karaoke" ? KARAOKE_UNSUNG : "&H000000FF",
       outline: preset.outline,
@@ -311,7 +325,7 @@ export function resolveClipStyle(
       cssFamily: font.cssFamily,
       cssWeight: font.cssWeight,
       fontSizePx: sz.previewPx,
-      color: preset.previewColor,
+      color: primaryPreview,
       box: preset.previewBox,
       textShadow: preset.previewShadow,
       align: pos.previewAlign,

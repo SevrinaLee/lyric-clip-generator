@@ -5,6 +5,9 @@ import type { Payment, Song } from "@/lib/types";
 import { PasswordForm } from "./PasswordForm";
 import { DisplayNameForm } from "./DisplayNameForm";
 import { BillingButton } from "./BillingButton";
+import { BrandKitForm } from "./BrandKitForm";
+import { getBrandKit } from "./actions";
+import { isPaidAccount } from "@/lib/access";
 
 export default async function AccountPage() {
   const supabase = await createClient();
@@ -37,6 +40,9 @@ export default async function AccountPage() {
           .returns<Pick<Song, "id" | "title">[]>()
       : { data: [] };
   const songTitleById = new Map((songs ?? []).map((s) => [s.id, s.title]));
+
+  const paidAccount = await isPaidAccount(user.id);
+  const brandKit = paidAccount ? await getBrandKit() : null;
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -116,6 +122,21 @@ export default async function AccountPage() {
             <p className="text-sm text-ink/50">No purchases yet.</p>
           )}
         </section>
+
+        {paidAccount && (
+          <section className="rounded-3xl bg-cream-deep border border-ink/10 p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-mauve" />
+              <h2 className="text-xs font-bold uppercase tracking-[0.15em] text-ink/50">
+                Brand kit
+              </h2>
+              <span className="rounded-full bg-gold/20 text-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                Creator
+              </span>
+            </div>
+            <BrandKitForm kit={brandKit} />
+          </section>
+        )}
       </div>
     </main>
   );

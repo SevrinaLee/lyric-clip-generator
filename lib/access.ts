@@ -89,6 +89,23 @@ export async function evaluateSongAccess(
   return LOCKED;
 }
 
+// Account-level paid status (founder or an active subscription) — for
+// features that aren't tied to a single song, like the brand kit.
+export async function isPaidAccount(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const supabase = await createClient();
+  const [{ data: profile }, { data: subs }] = await Promise.all([
+    supabase.from("profiles").select("is_founder").eq("id", userId).maybeSingle<{ is_founder: boolean }>(),
+    supabase
+      .from("subscriptions")
+      .select("status, current_period_end")
+      .eq("user_id", userId)
+      .order("current_period_end", { ascending: false, nullsFirst: false })
+      .limit(1),
+  ]);
+  return !!profile?.is_founder || isSubscriptionActive(subs?.[0]);
+}
+
 // Trust current_period_end over status alone: webhook events can arrive out of
 // order, so a subscription is "active" only if its status is active/trialing
 // AND it hasn't lapsed.
