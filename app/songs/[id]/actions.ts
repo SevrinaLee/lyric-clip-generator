@@ -252,6 +252,145 @@ export async function generateClips(songId: string) {
   revalidatePath(`/songs/${songId}`);
 }
 
+// Nudge a clip's window (start/end). Owner-only via RLS. Bounds: 3-60s and
+// within the song. Marks the hook score as user-adjusted so we don't present a
+// machine score for a hand-picked window. The download's stale badge is
+// handled client-side (a window change post-render marks the clip stale).
+export async function updateSegmentWindow(
+  segmentId: string,
+  startMs: number,
+  endMs: number,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  const { data: segment } = await supabase
+    .from("clip_segments")
+    .select("song_id")
+    .eq("id", segmentId)
+    .maybeSingle<{ song_id: string }>();
+  if (!segment) throw new Error("Clip segment not found");
+
+  const { data: song } = await supabase
+    .from("songs")
+    .select("duration_seconds")
+    .eq("id", segment.song_id)
+    .maybeSingle<{ duration_seconds: number | null }>();
+
+  const start = Math.max(0, Math.round(startMs));
+  let end = Math.round(endMs);
+  const durationMs = song?.duration_seconds
+    ? Math.round(song.duration_seconds * 1000)
+    : null;
+  if (durationMs) end = Math.min(end, durationMs);
+
+  const windowMs = end - start;
+  if (windowMs < 3000) throw new Error("A clip must be at least 3 seconds");
+  if (windowMs > 60000) throw new Error("A clip must be 60 seconds or less");
+
+  const { error } = await supabase
+    .from("clip_segments")
+    .update({
+      start_ms: start,
+      end_ms: end,
+      hook_score_review_status: "user-adjusted",
+    })
+    .eq("id", segmentId);
+  if (error) throw new Error(`Could not update clip window: ${error.message}`);
+
+  revalidatePath(`/songs/${segment.song_id}`);
+}
+
+// Re-suggest clips. Replaces the old "Clips already generated" dead-end:
+// segments WITHOUT a finished export are cleared and re-scored, while any
+// segment you've already exported is kept (its clip lives in your library).
+export async function regenerateClips(songId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in to regenerate clips");
+
+  const [{ data: song }, { data: lyrics }, { data: existing }, { data: templates }] =
+    await Promise.all([
+      supabase.from("songs").select("*").eq("id", songId).maybeSingle<Song>(),
+      supabase
+        .from("lyrics")
+        .select("*")
+        .eq("song_id", songId)
+        .order("line_index", { ascending: true })
+        .returns<Lyric[]>(),
+      supabase
+        .from("clip_segments")
+        .select("id, start_ms, end_ms")
+        .eq("song_id", songId)
+        .returns<{ id: string; start_ms: number; end_ms: number }[]>(),
+      supabase.from("video_templates").select("*").returns<VideoTemplate[]>(),
+    ]);
+
+  if (!song) throw new Error("Song not found");
+  if (!lyrics || lyrics.length === 0) {
+    throw new Error("Add lyrics before generating clips");
+  }
+
+  // Which segments have a finished export? Those are kept.
+  const segIds = (existing ?? []).map((s) => s.id);
+  const { data: doneExports } = segIds.length
+    ? await supabase
+        .from("exports")
+        .select("clip_segment_id")
+        .in("clip_segment_id", segIds)
+        .eq("status", "done")
+    : { data: [] as { clip_segment_id: string }[] };
+  const exportedSegIds = new Set(
+    (doneExports ?? []).map((e) => e.clip_segment_id),
+  );
+  const kept = (existing ?? []).filter((s) => exportedSegIds.has(s.id));
+  const toDelete = (existing ?? [])
+    .filter((s) => !exportedSegIds.has(s.id))
+    .map((s) => s.id);
+
+  if (toDelete.length > 0) {
+    const { error } = await supabase
+      .from("clip_segments")
+      .delete()
+      .in("id", toDelete);
+    if (error) throw new Error(`Could not clear old clips: ${error.message}`);
+  }
+
+  const generated = generateSegments(lyrics, song.title, song.duration_seconds);
+  const freeTemplates = (templates ?? []).filter((t) => !t.is_premium);
+  const templateList = freeTemplates.length > 0 ? freeTemplates : (templates ?? []);
+  const keptWindows = new Set(kept.map((s) => `${s.start_ms}-${s.end_ms}`));
+  const slotsLeft = Math.max(0, 3 - kept.length);
+  const newSegs = generated
+    .filter((g) => !keptWindows.has(`${g.start_ms}-${g.end_ms}`))
+    .slice(0, slotsLeft);
+
+  if (newSegs.length > 0) {
+    const rows = newSegs.map((seg, i) => ({
+      song_id: songId,
+      user_id: user.id,
+      label: seg.label,
+      start_ms: seg.start_ms,
+      end_ms: seg.end_ms,
+      platform: seg.platform,
+      template_id: templateList[i % templateList.length]?.id ?? null,
+      hook_score: seg.hook_score,
+      hook_score_source: "rule-based-v1",
+      hook_score_confidence: seg.hook_score_confidence,
+      hook_score_review_status: "unreviewed",
+    }));
+    const { error } = await supabase.from("clip_segments").insert(rows);
+    if (error) throw new Error("Couldn't regenerate clips — please try again");
+  }
+
+  revalidatePath(`/songs/${songId}`);
+}
+
 export async function selectTemplate(segmentId: string, templateId: string) {
   const supabase = await createClient();
   const {

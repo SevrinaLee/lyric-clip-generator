@@ -139,6 +139,9 @@ export default async function MyClipsPage() {
                   >
                     {seg.platform}
                   </span>
+                  <span className="hidden sm:inline-block rounded-full bg-ink/10 text-ink/60 px-2.5 py-1 text-xs font-semibold tabular-nums">
+                    {exp.format ?? "9:16"}
+                  </span>
                   {unlocked ? (
                     <a
                       href={`/api/exports/${exp.id}/download`}

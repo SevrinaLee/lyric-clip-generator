@@ -7,7 +7,14 @@ const PLATFORM_TAGS: Record<string, string[]> = {
   tiktok: ["fyp", "foryou", "tiktokmusic"],
   reels: ["reels", "instamusic", "reelsinstagram"],
   shorts: ["shorts", "ytshorts"],
+  youtube: ["youtube", "musicvideo", "lyricsvideo"],
 };
+
+// A landscape (16:9) export reads as regular YouTube regardless of the segment's
+// vertical platform; other formats keep the clip's assigned platform.
+export function captionPlatform(segmentPlatform: string, format?: string): string {
+  return format === "16:9" ? "youtube" : segmentPlatform;
+}
 
 export function suggestedHashtags(platform: string): string {
   const tags = [...BASE_TAGS, ...(PLATFORM_TAGS[platform] ?? [])];

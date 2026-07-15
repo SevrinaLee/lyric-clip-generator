@@ -9,12 +9,22 @@ import {
   type ResolvedClipStyle,
 } from "@/lib/captionStyles";
 import type { PreviewLine } from "@/lib/scoring";
+import { DEFAULT_FORMAT, type ClipFormat } from "@/lib/formats";
 
 const LINE_ANIMATION: Record<CaptionAnimation, string> = {
   fade: "animate-[clip-fade-in_0.4s_ease-out]",
   bounce: "animate-[clip-bounce_1s_ease-in-out_infinite]",
   wordpop: "",
   karaoke: "",
+};
+
+// Preview container shape per export format (so the preview matches what
+// exports). Widths chosen so the tall/short frames stay a similar footprint.
+const FORMAT_BOX: Record<ClipFormat, string> = {
+  "9:16": "aspect-9/16 w-28",
+  "1:1": "aspect-square w-32",
+  "4:5": "aspect-[4/5] w-28",
+  "16:9": "aspect-video w-44",
 };
 
 export function ClipPreviewPlayer({
@@ -24,6 +34,7 @@ export function ClipPreviewPlayer({
   lines,
   template,
   clipStyle,
+  format = DEFAULT_FORMAT,
 }: {
   audioUrl: string;
   startMs: number;
@@ -33,6 +44,8 @@ export function ClipPreviewPlayer({
   /** Effective caption style (template + per-clip overrides), resolved by
    *  lib/captionStyles.ts — the same object the export render consumes. */
   clipStyle: ResolvedClipStyle;
+  /** Export aspect ratio, so the preview frame matches the output. */
+  format?: ClipFormat;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -97,7 +110,7 @@ export function ClipPreviewPlayer({
   return (
     <div className="flex items-center gap-3">
       <div
-        className="relative aspect-9/16 w-28 shrink-0 overflow-hidden rounded-xl"
+        className={`relative ${FORMAT_BOX[format]} shrink-0 overflow-hidden rounded-xl`}
         style={{
           background: cssBackground(
             parseBackgroundStyle(template.background_style, template.primary_color),

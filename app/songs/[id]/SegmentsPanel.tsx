@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { ClipSegment, Export, VideoTemplate } from "@/lib/types";
 import type { AccessReason } from "@/lib/access";
-import { queueExport } from "./actions";
+import { queueExport, updateSegmentWindow, regenerateClips } from "./actions";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { LooksRow } from "./LooksRow";
@@ -41,6 +41,7 @@ export function SegmentsPanel({
   linesBySegment,
   exportsBySegment,
   lyricsUpdatedAt,
+  songDurationSeconds,
   unlocked,
   accessReason,
 }: {
@@ -53,28 +54,70 @@ export function SegmentsPanel({
   linesBySegment: Map<string, PreviewLine[]>;
   exportsBySegment: Map<string, Export>;
   lyricsUpdatedAt: string | null;
+  songDurationSeconds: number | null;
   unlocked: boolean;
   accessReason: AccessReason;
 }) {
   return (
-    <ul className="space-y-4">
-      {segments.map((segment) => (
-        <SegmentRow
-          key={segment.id}
-          songId={songId}
-          songTitle={songTitle}
-          songArtist={songArtist}
-          audioUrl={audioUrl}
-          segment={segment}
-          templates={templates}
-          lines={linesBySegment.get(segment.id) ?? []}
-          latestExport={exportsBySegment.get(segment.id)}
-          lyricsUpdatedAt={lyricsUpdatedAt}
-          unlocked={unlocked}
-          accessReason={accessReason}
-        />
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <RegenerateButton songId={songId} />
+      </div>
+      <ul className="space-y-4">
+        {segments.map((segment) => (
+          <SegmentRow
+            key={segment.id}
+            songId={songId}
+            songTitle={songTitle}
+            songArtist={songArtist}
+            audioUrl={audioUrl}
+            segment={segment}
+            templates={templates}
+            lines={linesBySegment.get(segment.id) ?? []}
+            latestExport={exportsBySegment.get(segment.id)}
+            lyricsUpdatedAt={lyricsUpdatedAt}
+            songDurationSeconds={songDurationSeconds}
+            unlocked={unlocked}
+            accessReason={accessReason}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RegenerateButton({ songId }: { songId: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleRegenerate() {
+    if (
+      !window.confirm(
+        "Re-suggest clips from your latest lyrics? Clips you've already exported are kept; the rest are replaced.",
+      )
+    )
+      return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await regenerateClips(songId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not regenerate");
+      }
+    });
+  }
+
+  return (
+    <div className="text-right">
+      <button
+        onClick={handleRegenerate}
+        disabled={isPending}
+        className="text-xs font-semibold text-ink/50 hover:text-ink hover:underline disabled:opacity-50"
+      >
+        {isPending ? "Regenerating…" : "↻ Regenerate clips"}
+      </button>
+      {error && <p className="text-sm text-mauve">{error}</p>}
+    </div>
   );
 }
 
@@ -88,6 +131,7 @@ function SegmentRow({
   lines,
   latestExport,
   lyricsUpdatedAt,
+  songDurationSeconds,
   unlocked,
   accessReason,
 }: {
@@ -100,6 +144,7 @@ function SegmentRow({
   lines: PreviewLine[];
   latestExport?: Export;
   lyricsUpdatedAt: string | null;
+  songDurationSeconds: number | null;
   unlocked: boolean;
   accessReason: AccessReason;
 }) {
@@ -125,6 +170,12 @@ function SegmentRow({
     caption_animation: segment.caption_animation ?? null,
   });
   const [format, setFormat] = useState<ClipFormat>(DEFAULT_FORMAT);
+  // Local clip window (optimistic) so nudges update the preview instantly;
+  // persisted via updateSegmentWindow. windowEditedAt marks the download stale
+  // when the window changes after a render (same-session).
+  const [startMs, setStartMs] = useState(segment.start_ms);
+  const [endMs, setEndMs] = useState(segment.end_ms);
+  const [windowEditedAt, setWindowEditedAt] = useState<string | null>(null);
 
   const paidTier = accessReason === "founder" || accessReason === "paid";
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
@@ -136,11 +187,41 @@ function SegmentRow({
   // save revalidates the page and pushes a newer lyricsUpdatedAt — the badge
   // then appears without the user touching this clip.
   const renderedAt = locallyRenderedAt ?? latestExport?.created_at ?? null;
+  const editedAfterRender = (at: string | null) =>
+    !!renderedAt && !!at && new Date(at).getTime() > new Date(renderedAt).getTime();
   const isStale =
     status === "done" &&
-    !!renderedAt &&
-    !!lyricsUpdatedAt &&
-    new Date(lyricsUpdatedAt).getTime() > new Date(renderedAt).getTime();
+    (editedAfterRender(lyricsUpdatedAt) || editedAfterRender(windowEditedAt));
+
+  const windowSeconds = (endMs - startMs) / 1000;
+  const fmtTime = (ms: number) => {
+    const s = Math.max(0, Math.round(ms / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+  const durationMs = songDurationSeconds ? Math.round(songDurationSeconds * 1000) : null;
+
+  // Nudge one edge by delta ms, respecting the 3–60s window + song bounds, then
+  // persist. Optimistic local update keeps the preview in sync instantly.
+  function nudge(edge: "start" | "end", deltaMs: number) {
+    let nextStart = startMs;
+    let nextEnd = endMs;
+    if (edge === "start") nextStart = Math.max(0, startMs + deltaMs);
+    else nextEnd = endMs + deltaMs;
+    if (durationMs) nextEnd = Math.min(nextEnd, durationMs);
+    const win = nextEnd - nextStart;
+    if (win < 3000 || win > 60000) return; // clamp: ignore out-of-range nudges
+    setStartMs(nextStart);
+    setEndMs(nextEnd);
+    setError(null);
+    setWindowEditedAt(new Date().toISOString());
+    startTransition(async () => {
+      try {
+        await updateSegmentWindow(segment.id, nextStart, nextEnd);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not adjust window");
+      }
+    });
+  }
 
   // Shared by the first export and every later refresh. A failed refresh keeps
   // the previous good clip downloadable rather than dropping to a failed state.
@@ -172,11 +253,62 @@ function SegmentRow({
           <span className="font-semibold text-ink">{segment.label}</span>
           <span className="text-ink/40 text-sm ml-2">{segment.platform}</span>
         </div>
-        {typeof segment.hook_score === "number" && (
-          <span className="text-xs font-bold rounded-full bg-gold/25 text-gold px-2.5 py-1">
-            hook {segment.hook_score.toFixed(2)}
+        {typeof segment.hook_score === "number" &&
+          segment.hook_score_review_status !== "user-adjusted" && (
+            <span className="text-xs font-bold rounded-full bg-gold/25 text-gold px-2.5 py-1">
+              hook {segment.hook_score.toFixed(2)}
+            </span>
+          )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink/60">
+        <div className="flex items-center gap-1">
+          <span className="text-ink/45">Start</span>
+          <button
+            type="button"
+            onClick={() => nudge("start", -1000)}
+            disabled={isPending}
+            className="h-6 w-6 rounded-full border border-ink/15 hover:bg-ink/5 disabled:opacity-40"
+          >
+            −
+          </button>
+          <span className="tabular-nums font-semibold text-ink w-9 text-center">
+            {fmtTime(startMs)}
           </span>
-        )}
+          <button
+            type="button"
+            onClick={() => nudge("start", 1000)}
+            disabled={isPending}
+            className="h-6 w-6 rounded-full border border-ink/15 hover:bg-ink/5 disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-ink/45">End</span>
+          <button
+            type="button"
+            onClick={() => nudge("end", -1000)}
+            disabled={isPending}
+            className="h-6 w-6 rounded-full border border-ink/15 hover:bg-ink/5 disabled:opacity-40"
+          >
+            −
+          </button>
+          <span className="tabular-nums font-semibold text-ink w-9 text-center">
+            {fmtTime(endMs)}
+          </span>
+          <button
+            type="button"
+            onClick={() => nudge("end", 1000)}
+            disabled={isPending}
+            className="h-6 w-6 rounded-full border border-ink/15 hover:bg-ink/5 disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+        <span className="text-ink/40 tabular-nums">
+          {windowSeconds.toFixed(0)}s clip
+        </span>
       </div>
 
       <LooksRow
@@ -212,11 +344,12 @@ function SegmentRow({
       {selectedTemplate && clipStyle && audioUrl && lines.length > 0 && (
         <ClipPreviewPlayer
           audioUrl={audioUrl}
-          startMs={segment.start_ms}
-          endMs={segment.end_ms}
+          startMs={startMs}
+          endMs={endMs}
           lines={lines}
           template={selectedTemplate}
           clipStyle={clipStyle}
+          format={format}
         />
       )}
 
@@ -268,7 +401,7 @@ function SegmentRow({
         </div>
         {format !== DEFAULT_FORMAT && (
           <p className="text-[11px] text-ink/40">
-            Preview shows 9:16; the export renders {format}.
+            The preview above matches this {format} format.
           </p>
         )}
       </div>
@@ -346,6 +479,7 @@ function SegmentRow({
           artist={songArtist}
           platform={segment.platform}
           hookLine={lines[0]?.text}
+          format={format}
         />
       )}
     </li>

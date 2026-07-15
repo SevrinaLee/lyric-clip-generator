@@ -254,6 +254,7 @@ export default async function SongDetailPage({
                 linesBySegment={linesBySegment}
                 exportsBySegment={exportsBySegment}
                 lyricsUpdatedAt={lyricsUpdatedAt}
+                songDurationSeconds={song.duration_seconds}
                 unlocked={access.unlocked}
                 accessReason={access.reason}
               />

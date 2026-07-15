@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buildCaption } from "@/lib/caption";
+import { buildCaption, captionPlatform } from "@/lib/caption";
 
 // Shown once a clip is rendered: a ready-to-post caption + hashtags the user
 // can tweak, copy, or fire straight into the native share sheet on mobile.
@@ -10,14 +10,16 @@ export function SharePanel({
   artist,
   platform,
   hookLine,
+  format,
 }: {
   title: string;
   artist?: string | null;
   platform: string;
   hookLine?: string | null;
+  format?: string;
 }) {
   const [caption, setCaption] = useState(() =>
-    buildCaption({ title, artist, platform, hookLine }),
+    buildCaption({ title, artist, platform: captionPlatform(platform, format), hookLine }),
   );
   const [copied, setCopied] = useState(false);
 
