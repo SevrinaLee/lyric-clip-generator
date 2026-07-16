@@ -66,9 +66,10 @@ const M6 = { ...M5, pay: "live", payinfra: "live" };
 const M7 = { ...M6, share: "live", myclips: "live" };
 // v1.6: the public showcase gallery goes live (approved-only, manual review).
 const M8 = { ...M7, showcase: "live" };
-// v1.7: the tip jar goes live; the showcase gains remix, clips gain custom
-// colors + GIF export + duplicate. Mobile stays "device" until the S7.6 pass.
-const M9 = { ...M8, support: "live" };
+// v1.7: the tip jar goes live; the showcase gains remix + pagination, clips
+// gain custom colors + image backgrounds + GIF export + duplicate. The S7.6
+// mobile-viewport pass flips the last "device" node to live.
+const M9 = { ...M8, support: "live", mobile: "live" };
 
 // helpers to build the block list
 const h1 = (text) => ({ type: "h1", text });
@@ -253,8 +254,8 @@ const BLOCKS = [
     "Custom colours are free but strict - every colour is validated server-side AND constrained by a database CHECK to #rrggbb hex, so a tampered write can't inject text into the render's filtergraph. A new security section guards it.",
     "GIF stays inside the budget - it is derived on the fly (never stored), hard-capped to 480px / 15fps / 6s, and gated by the same access check as the MP4 download.",
   ]),
-  para("One item in this phase - user-uploaded image backgrounds - was scoped as Creator-tier and excluded from the public showcase (the one real moderation surface) and is tracked separately; the mobile-viewport pass that will flip the last 'device' node to live is also still open."),
-  journey(M9, "Journey after Phase 13 (v1.7): the tip jar is live and the showcase now feeds a remix loop. Mobile layout remains the one 'device' node, pending the on-device pass."),
+  para("User-uploaded image backgrounds were scoped as Creator-tier and excluded from the public showcase (the one real moderation surface): the image is magic-byte sniffed, stored in a private per-user bucket, and re-encoded on render (stripping EXIF). The showcase gained cursor pagination (a static first page plus a load-more), and a mobile-viewport pass over every public surface confirmed zero horizontal overflow at phone width - flipping the last 'device' node to live."),
+  journey(M9, "Journey at v1.7 (current): the tip jar is live, the showcase feeds a remix loop and paginates, and the mobile layout is verified - every journey node is now live."),
 
   h1("3.  Where the app stands today (v1.7)"),
   para("Every step of the core journey works in live production, and the product now spans the full arc from 'make a clip' to 'run a subscription business on it', plus a growth loop and a way to give back: discover (including a public showcase), sign up, upload, auto-transcribe or tap timing, generate and adjust clips, customize captions, backgrounds and per-clip colours, remix a look from the showcase or duplicate a clip, preview in the true export shape, pay per song or subscribe, export in any aspect ratio as MP4 or a short GIF (watermark-free, HD, brand-stamped for subscribers), re-find everything in a clips library, and optionally leave a tip."),
@@ -263,7 +264,7 @@ const BLOCKS = [
   h2("Small open items (not blockers)"),
   bullets([
     "Auto-transcribe needs an OpenAI key to switch on. It is the optional path; typing or pasting lyrics works fully without it.",
-    "Mobile layout is built and code-verified but should get a 60-second look on a real phone (the build environment could not shrink below desktop width).",
+    "Mobile layout is verified at phone width (375px) across every public surface with zero horizontal overflow; the signed-in editor uses the same responsive wrapping.",
     "Two housekeeping items parked by choice: a second founder email still needs to sign up before it can be flagged, and a founder test account is on a temporary password.",
   ]),
   callout("The single highest-value next step is done", ["At the time the journey was first mapped, the biggest gap between 'great demo' and 'can take money' was the Stripe key. That is now connected and verified - the app can accept real payments."]),

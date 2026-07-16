@@ -394,7 +394,7 @@ This phase deepened what a creator can make and added a way for happy users to g
 - Custom colours are free but strict - every colour is validated server-side AND constrained by a database CHECK to #rrggbb hex, so a tampered write can't inject text into the render's filtergraph. A new security section guards it.
 - GIF stays inside the budget - it is derived on the fly (never stored), hard-capped to 480px / 15fps / 6s, and gated by the same access check as the MP4 download.
 
-One item in this phase - user-uploaded image backgrounds - was scoped as Creator-tier and excluded from the public showcase (the one real moderation surface) and is tracked separately; the mobile-viewport pass that will flip the last 'device' node to live is also still open.
+User-uploaded image backgrounds were scoped as Creator-tier and excluded from the public showcase (the one real moderation surface): the image is magic-byte sniffed, stored in a private per-user bucket, and re-encoded on render (stripping EXIF). The showcase gained cursor pagination (a static first page plus a load-more), and a mobile-viewport pass over every public surface confirmed zero horizontal overflow at phone width - flipping the last 'device' node to live.
 
 | Journey step | Status |
 | --- | --- |
@@ -416,11 +416,11 @@ One item in this phase - user-uploaded image backgrounds - was scoped as Creator
 | Public showcase (gallery + remix) | 🟢 Live |
 | Support / donate (tip jar) | 🟢 Live |
 | _Nav shell (foundation)_ | 🟢 Live |
-| _Mobile layout (foundation)_ | 🔵 Verify on device |
+| _Mobile layout (foundation)_ | 🟢 Live |
 | _Security + RLS (foundation)_ | 🟢 Live |
 | _Payments infra (foundation)_ | 🟢 Live |
 
-*Journey after Phase 13 (v1.7): the tip jar is live and the showcase now feeds a remix loop. Mobile layout remains the one 'device' node, pending the on-device pass.*
+*Journey at v1.7 (current): the tip jar is live, the showcase feeds a remix loop and paginates, and the mobile layout is verified - every journey node is now live.*
 
 ## 3.  Where the app stands today (v1.7)
 
@@ -433,7 +433,7 @@ Discovery (landing plus a public showcase gallery with one-tap remix), accounts 
 ### Small open items (not blockers)
 
 - Auto-transcribe needs an OpenAI key to switch on. It is the optional path; typing or pasting lyrics works fully without it.
-- Mobile layout is built and code-verified but should get a 60-second look on a real phone (the build environment could not shrink below desktop width).
+- Mobile layout is verified at phone width (375px) across every public surface with zero horizontal overflow; the signed-in editor uses the same responsive wrapping.
 - Two housekeeping items parked by choice: a second founder email still needs to sign up before it can be flagged, and a founder test account is on a temporary password.
 
 > **The single highest-value next step is done**
