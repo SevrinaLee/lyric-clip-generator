@@ -46,6 +46,8 @@ const SPINE = [
   { k: "share", lines: ["Share +", "caption"], name: "Share + caption" },
   { k: "account", lines: ["Account"], name: "Account" },
   { k: "myclips", lines: ["My clips"], name: "My clips (library)" },
+  { k: "showcase", lines: ["Showcase"], name: "Public showcase (gallery + remix)" },
+  { k: "support", lines: ["Support /", "donate"], name: "Support / donate (tip jar)" },
 ];
 const FOUND = [
   { k: "navshell", lines: ["Nav shell"], name: "Nav shell" },
@@ -62,6 +64,11 @@ const M4 = { ...M3, access: "live", security: "live" };
 const M5 = { ...M4, mysongs: "live", navshell: "live", mobile: "device" };
 const M6 = { ...M5, pay: "live", payinfra: "live" };
 const M7 = { ...M6, share: "live", myclips: "live" };
+// v1.6: the public showcase gallery goes live (approved-only, manual review).
+const M8 = { ...M7, showcase: "live" };
+// v1.7: the tip jar goes live; the showcase gains remix, clips gain custom
+// colors + GIF export + duplicate. Mobile stays "device" until the S7.6 pass.
+const M9 = { ...M8, support: "live" };
 
 // helpers to build the block list
 const h1 = (text) => ({ type: "h1", text });
@@ -229,10 +236,30 @@ const BLOCKS = [
     "One item was attempted and deferred - a background render pipeline (so exports show a progress bar and survive heavy jobs) was built and tested on a preview deploy, but this project's Vercel plan has no Fluid Compute to keep a function alive for post-response work, so renders stay synchronous (reliable, and clips are short) until the plan is upgraded or an external queue is added.",
   ]),
 
-  h1("3.  Where the app stands today (v1.5)"),
-  para("Every step of the core journey works in live production, and the product now spans the full arc from 'make a clip' to 'run a subscription business on it': discover, sign up, upload, auto-transcribe or tap timing, generate and adjust clips, customize captions and backgrounds, preview in the true export shape, pay per song or subscribe, export in any aspect ratio (watermark-free, HD, brand-stamped for subscribers), and re-find everything in a clips library."),
+  journey(M7, "Journey after Phase 11 (v1.5): recurring revenue and brand kits complete the paid ladder. Showcase and Support do not exist yet - both are still 'todo'."),
+
+  h2("Phase 12 - Growth loop: the public showcase (v1.6)"),
+  para("With the product mature, the next phase gave finished clips somewhere to be seen and to pull new users in. A public showcase gallery displays approved clips with their format-correct aspect, served statically (ISR) via the service-role client because everything shown is intentionally public. A clip only appears after manual approval - there is deliberately no self-approve path, and a per-account cap limits how many submissions can sit pending, so the gallery can't be spammed."),
+  bullets([
+    "Approved-only by construction - the showcase_entries table has an insert policy that also verifies the submitter owns the underlying export, and NO client update policy, so nobody can flip their own entry to approved. The security suite proves both.",
+    "Zero marginal AI - the whole growth loop is rule-based and static; it costs nothing per view and needs no key.",
+  ]),
+  journey(M8, "Journey after Phase 12 (v1.6): the public showcase is live - a discovery surface feeding new users back into the top of the funnel."),
+
+  h2("Phase 13 - Creativity & generosity within the free tier (v1.7)"),
+  para("This phase deepened what a creator can make and added a way for happy users to give back - all inside the same free-infrastructure limits (synchronous render, free Supabase, no AI key). A tip jar ('Support') lets anyone leave a one-off donation through Stripe, deliberately decoupled from access so a tip never unlocks a song or grants a plan. Clips gained open-ended custom colours (two background colours plus a caption colour, per clip), a one-tap 'Remix this look' from any showcase card into a new song, a duplicate-a-clip action for fast style variants, and an on-the-fly GIF export (a short, silent, palette-optimised loop). The template and Look libraries also roughly doubled."),
+  bullets([
+    "Donation safety - the amount is validated server-side to a sane range and the donation carries no song/payment id, so it can never reach the access resolver; it grants nothing by construction.",
+    "Custom colours are free but strict - every colour is validated server-side AND constrained by a database CHECK to #rrggbb hex, so a tampered write can't inject text into the render's filtergraph. A new security section guards it.",
+    "GIF stays inside the budget - it is derived on the fly (never stored), hard-capped to 480px / 15fps / 6s, and gated by the same access check as the MP4 download.",
+  ]),
+  para("One item in this phase - user-uploaded image backgrounds - was scoped as Creator-tier and excluded from the public showcase (the one real moderation surface) and is tracked separately; the mobile-viewport pass that will flip the last 'device' node to live is also still open."),
+  journey(M9, "Journey after Phase 13 (v1.7): the tip jar is live and the showcase now feeds a remix loop. Mobile layout remains the one 'device' node, pending the on-device pass."),
+
+  h1("3.  Where the app stands today (v1.7)"),
+  para("Every step of the core journey works in live production, and the product now spans the full arc from 'make a clip' to 'run a subscription business on it', plus a growth loop and a way to give back: discover (including a public showcase), sign up, upload, auto-transcribe or tap timing, generate and adjust clips, customize captions, backgrounds and per-clip colours, remix a look from the showcase or duplicate a clip, preview in the true export shape, pay per song or subscribe, export in any aspect ratio as MP4 or a short GIF (watermark-free, HD, brand-stamped for subscribers), re-find everything in a clips library, and optionally leave a tip."),
   h2("Live and working"),
-  para("Discovery, accounts and password reset, My songs, upload, lyric entry / timing editors / auto-transcription with per-word timing, rule-based clip generation with window nudging and regenerate, full per-clip caption customization (font, size, style, position, fade/bounce/word-pop/karaoke) with animated and audio-reactive backgrounds and one-tap Looks, multi-format export (9:16/1:1/4:5/16:9), the access gate (founder / first-song-free / single purchase / Creator subscription), real multi-method payments and recurring billing, the brand kit, the My clips library, share + caption helpers, the account area, the navigation shell, and a 38-test security suite running on every change."),
+  para("Discovery (landing plus a public showcase gallery with one-tap remix), accounts and password reset, My songs, upload, lyric entry / timing editors / auto-transcription with per-word timing, rule-based clip generation with window nudging, regenerate and duplicate-a-clip, full per-clip caption customization (font, size, style, position, fade/bounce/word-pop/karaoke) with animated and audio-reactive backgrounds, per-clip custom colours and one-tap Looks, multi-format export (9:16/1:1/4:5/16:9) as MP4 or an on-the-fly GIF, the access gate (founder / first-song-free / single purchase / Creator subscription), real multi-method payments and recurring billing, a Stripe tip jar decoupled from access, the brand kit, the My clips library, share + caption helpers, the account area, the navigation shell, and an automated security suite (extended with a per-clip custom-colours section) running on every change."),
   h2("Small open items (not blockers)"),
   bullets([
     "Auto-transcribe needs an OpenAI key to switch on. It is the optional path; typing or pasting lyrics works fully without it.",
@@ -254,11 +281,11 @@ const BLOCKS = [
     "ffmpeg (via ffmpeg-static) - trims audio and burns in captions using the libass 'ass' subtitle filter; a bundled Noto Sans font is shipped with the app.",
   ]),
   h2("How data isolation works"),
-  para("Every user-owned table (songs, lyrics, lyric_words, clip_segments, payments, exports, profiles, subscriptions, brand_kits, render_jobs) has Row-Level Security enabled with an auth.uid() = user_id policy. Adding a new user-scoped table requires an accompanying RLS migration in the same change. Money- and access-granting tables (subscriptions, brand_kits, render_jobs) are owner READ-only - only the service-role client writes them - so a client can never grant itself a plan or fake a render's status. The service-role key bypasses RLS and is used only server-to-server (the Stripe webhook, the free-song claim, and background writes), never in a request carrying a user session."),
+  para("Every user-owned table (songs, lyrics, lyric_words, clip_segments, payments, exports, profiles, subscriptions, brand_kits, render_jobs, showcase_entries) has Row-Level Security enabled with an auth.uid() = user_id policy. Adding a new user-scoped table requires an accompanying RLS migration in the same change. Money- and access-granting tables (subscriptions, brand_kits, render_jobs) are owner READ-only - only the service-role client writes them - so a client can never grant itself a plan or fake a render's status. The service-role key bypasses RLS and is used only server-to-server (the Stripe webhook, the free-song claim, and background writes), never in a request carrying a user session."),
   h2("The access model"),
   para("Centralised in lib/access.ts's evaluateSongAccess - one function every gate consults. A clip's premium options and watermark-free HD download unlock when the account is a founder, OR has an active Creator subscription (which unlocks EVERY song via a single early check), OR the song is the user's one claimed free song, OR a paid payment exists for it. Because every premium feature (fonts, styles, formats, templates, brand kit) routes through this one resolver and the exportTier it returns, adding the subscription lit them all up at once. The is_founder and free_song_id columns are locked at the database grant level so a user cannot self-promote or rotate their free song."),
   h2("The security suite"),
-  para("tests/security/ runs on every push/PR via GitHub Actions - 38 tests across data isolation, SQL-injection prevention, brute-force rate-limiting, data-exfiltration prevention, privilege-escalation prevention, and per-table isolation for every feature table (caption styles, per-word timing, export format, render jobs, subscriptions, brand kits). It runs against the real Supabase project with disposable users cleaned up after each run. Uploads add a magic-byte file check (verify:brand) and renders are checked by frame extraction (verify:captions)."),
+  para("tests/security/ runs on every push/PR via GitHub Actions - across data isolation, SQL-injection prevention, brute-force rate-limiting, data-exfiltration prevention, privilege-escalation prevention, and per-table isolation for every feature table (caption styles, per-word timing, export format, render jobs, subscriptions, brand kits, the public showcase, and per-clip custom colours). It runs against the real Supabase project with disposable users cleaned up after each run. Uploads add a magic-byte file check (verify:brand), renders are checked by frame extraction (verify:captions / verify:gif), and pure validators (donation amounts, custom colours) have their own checks (verify:donation / verify:colors)."),
   h2("Notable production lessons"),
   bullets([
     "Serverless bundles differ from local: file paths, native binaries, and build caches all bit us on the ffmpeg export path.",

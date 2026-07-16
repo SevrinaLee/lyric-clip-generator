@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { linesForSegment, attachWordTiming } from "./scoring";
-import { renderClip, WATERMARK_TEXT } from "./render";
+import { renderClip, WATERMARK_TEXT, type RenderKind } from "./render";
 import { resolveClipStyle } from "./captionStyles";
 import { resolveSegmentBackground } from "./backgrounds";
 import { renderDimensions, formatSlug, DEFAULT_FORMAT, type ClipFormat } from "./formats";
@@ -15,6 +15,7 @@ export async function renderSegmentToBuffer(
   segment: ClipSegment,
   tier: ExportTier,
   format: ClipFormat = DEFAULT_FORMAT,
+  kind: RenderKind = "mp4",
 ): Promise<Buffer> {
   if (!segment.template_id) throw new Error("Pick a template first");
 
@@ -96,6 +97,7 @@ export async function renderSegmentToBuffer(
     width: dims.width,
     height: dims.height,
     caption: style.ass,
+    kind,
   });
 }
 

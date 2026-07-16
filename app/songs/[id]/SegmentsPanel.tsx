@@ -564,6 +564,13 @@ function SegmentRow({
                 >
                   Download
                 </a>
+                <a
+                  href={`/api/exports/${exportId}/gif`}
+                  title="Download a short looping GIF of this clip"
+                  className="text-xs font-semibold text-ink/45 hover:text-ink hover:underline"
+                >
+                  GIF
+                </a>
                 {isStale ? (
                   <span className="text-xs font-semibold text-gold">
                     outdated

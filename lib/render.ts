@@ -25,6 +25,14 @@ const DESIGN_H = 1920;
 const REF_H = 1920;
 export const WATERMARK_TEXT = "made with Lyric Clip Generator";
 
+// GIF output (v1.7 S7.5): a small, short looping GIF derived from the same
+// composed frame. GIFs balloon fast, so cap width/fps/duration hard — this
+// keeps the file shareable and the render well inside the sync budget.
+export type RenderKind = "mp4" | "gif";
+const GIF_FPS = 15;
+const GIF_WIDTH = 480;
+const GIF_MAX_SECONDS = 6;
+
 // ffmpeg-static's prebuilt linux binary (johnvansickle.com) does not compile
 // in the "drawtext" filter, even though its configure flags list
 // --enable-libfreetype — confirmed by inspecting `ffmpeg -filters` in
@@ -259,6 +267,7 @@ export async function renderClip({
   brandAccent = null,
   width = DESIGN_W,
   height = DESIGN_H,
+  kind = "mp4",
 }: {
   audioUrl: string;
   startMs: number;
@@ -278,12 +287,15 @@ export async function renderClip({
   brandAccent?: string | null;
   width?: number;
   height?: number;
+  /** "mp4" (default, with audio) or "gif" (short, silent, palette-optimized). */
+  kind?: RenderKind;
 }): Promise<Buffer> {
   if (!ffmpegPath) throw new Error("ffmpeg binary not found");
 
+  const isGif = kind === "gif";
   const dir = await mkdtemp(path.join(tmpdir(), "clip-"));
   const sourcePath = path.join(dir, "source");
-  const outPath = path.join(dir, "out.mp4");
+  const outPath = path.join(dir, isGif ? "out.gif" : "out.mp4");
   const assPath = path.join(dir, "captions.ass");
   const logoPath = path.join(dir, "logo.img");
 
@@ -292,7 +304,10 @@ export async function renderClip({
     if (!res.ok) throw new Error(`Could not fetch audio: ${res.status}`);
     await writeFile(sourcePath, Buffer.from(await res.arrayBuffer()));
 
-    const durationSeconds = (endMs - startMs) / 1000;
+    // GIFs are hard-capped in length; MP4 uses the full clip window.
+    const durationSeconds = isGif
+      ? Math.min((endMs - startMs) / 1000, GIF_MAX_SECONDS)
+      : (endMs - startMs) / 1000;
     const startSeconds = startMs / 1000;
 
     // Author captions at the reference height with an aspect-matched width, so
@@ -336,6 +351,31 @@ export async function renderClip({
       const logoH = Math.round(height * 0.08);
       filterComplex += `;[2:v]scale=-1:${logoH}[lg];[v][lg]overlay=W-w-40:H-h-40[out]`;
       videoLabel = "[out]";
+    }
+
+    if (isGif) {
+      // Derive a small looping GIF from the composed frame: downscale + cap fps,
+      // then a two-pass palette (palettegen/paletteuse) for clean colors at a
+      // shareable size. No audio in a GIF.
+      // A waveform background splits [0:a] into an [aud] output for muxing;
+      // since a GIF has no audio, that label would dangle and fail the graph —
+      // sink it explicitly.
+      if (bgSrc.audioMap.startsWith("[")) {
+        filterComplex += `;${bgSrc.audioMap}anullsink`;
+      }
+      filterComplex +=
+        `;${videoLabel}fps=${GIF_FPS},scale=${GIF_WIDTH}:-2:flags=lanczos,` +
+        `split[gs][gp];[gp]palettegen=stats_mode=diff[pal];` +
+        `[gs][pal]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle[gout]`;
+      await run(ffmpegPath, [
+        "-y",
+        ...inputs,
+        "-filter_complex", filterComplex,
+        "-map", "[gout]",
+        "-loop", "0",
+        outPath,
+      ]);
+      return await readFile(outPath);
     }
 
     await run(ffmpegPath, [
