@@ -142,6 +142,11 @@ export function TapTimingTool({
           <p className="font-display text-xl text-ink min-h-[1.5em]">
             {lyrics[cursor]?.text || "(blank line)"}
           </p>
+          {lyrics[cursor + 1] && (
+            <p className="text-sm text-ink/35 truncate">
+              next: {lyrics[cursor + 1].text || "(blank line)"}
+            </p>
+          )}
         </>
       ) : (
         <p className="text-sm text-sage font-semibold">

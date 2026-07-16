@@ -625,6 +625,17 @@ export async function submitToShowcase(exportId: string, title: string) {
     .maybeSingle<{ id: string }>();
   if (existing) return { alreadySubmitted: true };
 
+  // Abuse guard: cap how many submissions one account can queue (spam / storage
+  // pressure on the free tier). Approved entries don't count against it.
+  const { count } = await supabase
+    .from("showcase_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("approved", false);
+  if ((count ?? 0) >= 15) {
+    throw new Error("You have a lot of clips awaiting review already — thanks!");
+  }
+
   const { error } = await supabase.from("showcase_entries").insert({
     export_id: exportId,
     user_id: user.id,

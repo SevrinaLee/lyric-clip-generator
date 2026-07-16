@@ -89,6 +89,45 @@ export const LOOKS: Look[] = [
       caption_animation: "fade",
     },
   },
+  {
+    id: "ink",
+    name: "Bold Dark",
+    emoji: "🖤",
+    templateName: "Ink", // free solid
+    overrides: {
+      caption_font: "Montserrat ExtraBold",
+      caption_size: "lg",
+      caption_style_preset: "outline",
+      caption_position: "lower",
+      caption_animation: "wordpop",
+    },
+  },
+  {
+    id: "crimson",
+    name: "Crimson",
+    emoji: "🔴",
+    templateName: "Crimson Wave", // premium waveform
+    overrides: {
+      caption_font: "Anton",
+      caption_size: "lg",
+      caption_style_preset: "outline-yellow",
+      caption_position: "lower",
+      caption_animation: "karaoke",
+    },
+  },
+  {
+    id: "dream",
+    name: "Dream",
+    emoji: "🌌",
+    templateName: "Aurora", // premium gradient
+    overrides: {
+      caption_font: "Poppins Bold",
+      caption_size: "md",
+      caption_style_preset: "box",
+      caption_position: "center",
+      caption_animation: "fade",
+    },
+  },
 ];
 
 export function resolveLookTemplate(
