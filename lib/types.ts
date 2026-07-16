@@ -75,6 +75,15 @@ export type ClipSegment = {
   created_at: string;
 };
 
+export type ShowcaseEntry = {
+  id: string;
+  export_id: string;
+  user_id: string | null;
+  title: string | null;
+  approved: boolean;
+  created_at: string;
+};
+
 export type BrandKit = {
   user_id: string;
   display_name: string | null;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { buildCaption, captionPlatform } from "@/lib/caption";
+import { submitToShowcase } from "./actions";
 
 // Shown once a clip is rendered: a ready-to-post caption + hashtags the user
 // can tweak, copy, or fire straight into the native share sheet on mobile.
@@ -11,17 +12,38 @@ export function SharePanel({
   platform,
   hookLine,
   format,
+  exportId,
 }: {
   title: string;
   artist?: string | null;
   platform: string;
   hookLine?: string | null;
   format?: string;
+  exportId?: string;
 }) {
   const [caption, setCaption] = useState(() =>
     buildCaption({ title, artist, platform: captionPlatform(platform, format), hookLine }),
   );
   const [copied, setCopied] = useState(false);
+  const [showcaseState, setShowcaseState] = useState<
+    "idle" | "submitted" | "error"
+  >("idle");
+  const [showcaseError, setShowcaseError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleShowcase() {
+    if (!exportId) return;
+    setShowcaseError(null);
+    startTransition(async () => {
+      try {
+        await submitToShowcase(exportId, `${title}${artist ? " — " + artist : ""}`);
+        setShowcaseState("submitted");
+      } catch (err) {
+        setShowcaseState("error");
+        setShowcaseError(err instanceof Error ? err.message : "Could not submit");
+      }
+    });
+  }
 
   async function copy() {
     try {
@@ -74,6 +96,27 @@ export function SharePanel({
           Share…
         </button>
       </div>
+
+      {exportId && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-sky/20 pt-2">
+          {showcaseState === "submitted" ? (
+            <span className="text-xs text-sage font-semibold">
+              ✓ Submitted for the showcase — we&apos;ll review it
+            </span>
+          ) : (
+            <button
+              onClick={handleShowcase}
+              disabled={isPending}
+              className="text-xs font-semibold text-ink/60 hover:text-ink hover:underline disabled:opacity-50"
+            >
+              {isPending ? "Submitting…" : "✨ Submit to the public showcase"}
+            </button>
+          )}
+          {showcaseError && (
+            <span className="text-xs text-mauve">{showcaseError}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -786,6 +786,80 @@ describe("12. Brand kits (0020)", () => {
   });
 });
 
+// ── 13. SHOWCASE (migration 0021) ──────────────────────────────────────────
+// The first PUBLIC user content, so the RLS is the crux: anon/other users see
+// APPROVED rows only; a client can neither self-publish (insert approved=true /
+// update approved) nor submit someone else's export.
+describe("13. Public showcase (0021)", () => {
+  let approvedExportId, pendingExportId;
+
+  before(async () => {
+    const mkExport = async () => {
+      const { data: seg } = await admin
+        .from("clip_segments")
+        .insert({ song_id: ctx.a.songId, user_id: ctx.a.user.id, label: "Hook", start_ms: 0, end_ms: 8000, platform: "tiktok" })
+        .select("id").single();
+      const { data: exp } = await admin
+        .from("exports")
+        .insert({ clip_segment_id: seg.id, user_id: ctx.a.user.id, status: "done", platform: "tiktok", video_url: "x.mp4" })
+        .select("id").single();
+      return exp.id;
+    };
+    approvedExportId = await mkExport();
+    pendingExportId = await mkExport();
+    await admin.from("showcase_entries").insert([
+      { export_id: approvedExportId, user_id: ctx.a.user.id, title: "Approved clip", approved: true },
+      { export_id: pendingExportId, user_id: ctx.a.user.id, title: "Pending clip", approved: false },
+    ]);
+  });
+
+  it("anon sees only APPROVED entries", async () => {
+    const anon = anonClient(env);
+    const { data } = await anon.from("showcase_entries").select("title, approved");
+    const titles = (data ?? []).map((r) => r.title);
+    assert.ok(titles.includes("Approved clip"), "approved is public");
+    assert.ok(!titles.includes("Pending clip"), "pending must NOT be public");
+    assert.ok((data ?? []).every((r) => r.approved === true), "anon sees approved only");
+  });
+
+  it("B cannot see A's pending entry", async () => {
+    const { data } = await ctx.b.client
+      .from("showcase_entries")
+      .select("title")
+      .eq("export_id", pendingExportId);
+    assert.equal(data?.length ?? 0, 0, "another user can't see pending entries");
+  });
+
+  it("a client cannot self-publish (insert approved=true)", async () => {
+    const { data } = await ctx.a.client
+      .from("showcase_entries")
+      .insert({ export_id: approvedExportId, user_id: ctx.a.user.id, approved: true })
+      .select();
+    assert.equal(data?.length ?? 0, 0, "insert with approved=true must be blocked");
+  });
+
+  it("a client cannot flip an entry to approved (no update policy)", async () => {
+    await ctx.a.client
+      .from("showcase_entries")
+      .update({ approved: true })
+      .eq("export_id", pendingExportId);
+    const { data: check } = await admin
+      .from("showcase_entries")
+      .select("approved")
+      .eq("export_id", pendingExportId)
+      .single();
+    assert.equal(check.approved, false, "self-approval must not take effect");
+  });
+
+  it("B cannot submit A's export to the showcase", async () => {
+    const { data } = await ctx.b.client
+      .from("showcase_entries")
+      .insert({ export_id: approvedExportId, user_id: ctx.b.user.id, approved: false })
+      .select();
+    assert.equal(data?.length ?? 0, 0, "can't submit an export you don't own");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

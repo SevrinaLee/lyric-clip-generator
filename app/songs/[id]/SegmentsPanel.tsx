@@ -481,6 +481,7 @@ function SegmentRow({
           platform={segment.platform}
           hookLine={lines[0]?.text}
           format={format}
+          exportId={exportId}
         />
       )}
     </li>

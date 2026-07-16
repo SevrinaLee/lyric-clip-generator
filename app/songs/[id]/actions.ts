@@ -597,3 +597,40 @@ export async function queueExport(segmentId: string, format: string = DEFAULT_FO
     revalidatePath(`/songs/${segment.song_id}`);
   }
 }
+
+// Opt-in submission to the public showcase (v1.6). Consent-based: publishing a
+// user's clip requires this explicit action. Inserts an UNAPPROVED entry;
+// approval is manual (service role / SQL editor), so nothing goes public until
+// curated. Idempotent per export.
+export async function submitToShowcase(exportId: string, title: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  // RLS ensures the export is the caller's; also require it to be finished.
+  const { data: exp } = await supabase
+    .from("exports")
+    .select("id, status")
+    .eq("id", exportId)
+    .maybeSingle<{ id: string; status: string }>();
+  if (!exp) throw new Error("Export not found");
+  if (exp.status !== "done") throw new Error("Finish rendering the clip first");
+
+  const { data: existing } = await supabase
+    .from("showcase_entries")
+    .select("id")
+    .eq("export_id", exportId)
+    .maybeSingle<{ id: string }>();
+  if (existing) return { alreadySubmitted: true };
+
+  const { error } = await supabase.from("showcase_entries").insert({
+    export_id: exportId,
+    user_id: user.id,
+    title: title.trim().slice(0, 80) || null,
+    approved: false,
+  });
+  if (error) throw new Error(`Could not submit: ${error.message}`);
+  return { alreadySubmitted: false };
+}

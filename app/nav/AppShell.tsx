@@ -26,6 +26,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             Lyric Clip Generator
           </Link>
           <div className="flex items-center gap-4">
+            <Link href="/showcase" className="text-ink/50 hover:text-ink">
+              Showcase
+            </Link>
             <Link href="/pricing" className="text-ink/50 hover:text-ink">
               Pricing
             </Link>
