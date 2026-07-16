@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { LOOKS } from "@/lib/looks";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/wave"];
@@ -11,6 +12,10 @@ export async function createSong(formData: FormData) {
   const artist = String(formData.get("artist") ?? "").trim();
   const duration = formData.get("duration_seconds");
   const file = formData.get("audio") as File | null;
+  // Remix carry-through (S7.4): only a known Look id survives, so the redirect
+  // param can't be used to inject anything.
+  const rawLook = String(formData.get("look") ?? "").trim();
+  const look = LOOKS.some((l) => l.id === rawLook) ? rawLook : null;
 
   if (!title || !artist) {
     throw new Error("Title and artist are required");
@@ -63,5 +68,5 @@ export async function createSong(formData: FormData) {
     throw new Error(`Could not save song: ${insertError?.message}`);
   }
 
-  redirect(`/songs/${song.id}`);
+  redirect(look ? `/songs/${song.id}?look=${look}` : `/songs/${song.id}`);
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { NewSongForm } from "./NewSongForm";
 
 export default function NewSongPage() {
@@ -20,7 +21,9 @@ export default function NewSongPage() {
         <h1 className="font-display text-4xl text-ink">New song</h1>
 
         <div className="rounded-3xl bg-cream-deep border border-ink/10 p-6 sm:p-8 shadow-[0_20px_48px_-24px_rgba(43,43,43,0.35)]">
-          <NewSongForm />
+          <Suspense fallback={null}>
+            <NewSongForm />
+          </Suspense>
         </div>
       </div>
     </main>

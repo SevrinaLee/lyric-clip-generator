@@ -9,10 +9,10 @@ import { resolveClipStyle, hexToAss } from "../lib/captionStyles";
 
 const template = {
   font: "Montserrat ExtraBold",
-  animation_preset: "wordpop",
+  animation_preset: "fade" as const,
   background_style: "gradient:#111111:#222222",
   primary_color: "#333333",
-} as const;
+};
 
 let failures = 0;
 function check(label: string, got: unknown, want: unknown) {

@@ -544,6 +544,54 @@ export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdat
   revalidatePath(`/songs/${segment.song_id}`);
 }
 
+// Duplicate a clip (v1.7 S7.4): copy a segment's window + template + every
+// style/color override into a new segment on the SAME song, so a user can keep
+// one variant and restyle the copy. Ownership is enforced two ways: we read the
+// source under the caller's RLS session (so B can't read A's segment), and the
+// insert carries user_id = the authenticated user. No re-scoring.
+export async function duplicateSegment(segmentId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  const { data: src } = await supabase
+    .from("clip_segments")
+    .select("*")
+    .eq("id", segmentId)
+    .maybeSingle<ClipSegment>();
+  if (!src) throw new Error("Clip segment not found");
+
+  const { data: copy, error } = await supabase
+    .from("clip_segments")
+    .insert({
+      song_id: src.song_id,
+      user_id: user.id,
+      label: `${src.label} (copy)`,
+      start_ms: src.start_ms,
+      end_ms: src.end_ms,
+      platform: src.platform,
+      template_id: src.template_id,
+      caption_font: src.caption_font ?? null,
+      caption_size: src.caption_size ?? null,
+      caption_position: src.caption_position ?? null,
+      caption_style_preset: src.caption_style_preset ?? null,
+      caption_animation: src.caption_animation ?? null,
+      custom_bg_c0: src.custom_bg_c0 ?? null,
+      custom_bg_c1: src.custom_bg_c1 ?? null,
+      custom_caption_color: src.custom_caption_color ?? null,
+    })
+    .select("id")
+    .single();
+  if (error || !copy) {
+    throw new Error(`Could not duplicate clip: ${error?.message ?? "unknown"}`);
+  }
+
+  revalidatePath(`/songs/${src.song_id}`);
+  return copy.id as string;
+}
+
 export async function queueExport(segmentId: string, format: string = DEFAULT_FORMAT) {
   const supabase = await createClient();
   const {

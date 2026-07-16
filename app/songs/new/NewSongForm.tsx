@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { unstable_rethrow } from "next/navigation";
+import { unstable_rethrow, useSearchParams } from "next/navigation";
 import { createSong } from "./actions";
+import { LOOKS } from "@/lib/looks";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -11,6 +12,9 @@ export function NewSongForm() {
   const [duration, setDuration] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  // Remix deep-link (S7.4): a validated Look id carried from the showcase.
+  const lookId = useSearchParams().get("look");
+  const remixLook = lookId ? LOOKS.find((l) => l.id === lookId) : undefined;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -47,6 +51,15 @@ export function NewSongForm() {
 
   return (
     <form ref={formRef} action={handleSubmit} className="space-y-5">
+      {remixLook && (
+        <div className="rounded-xl bg-lavender/15 border border-lavender/40 px-4 py-3 text-sm text-ink">
+          <span className="font-semibold">
+            {remixLook.emoji} Remixing the {remixLook.name} look.
+          </span>{" "}
+          Upload your song and we&apos;ll offer to apply it to every clip.
+          <input type="hidden" name="look" value={remixLook.id} />
+        </div>
+      )}
       <div>
         <label htmlFor="title" className="block text-sm font-medium mb-1 text-ink/70">
           Song title

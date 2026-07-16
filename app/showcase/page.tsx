@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { LOOKS } from "@/lib/looks";
 import type { ClipSegment, Export, ShowcaseEntry, Song, VideoTemplate } from "@/lib/types";
 
 export const metadata: Metadata = {
@@ -85,6 +86,13 @@ export default async function ShowcasePage() {
         title: entry.title ?? song?.title ?? "Lyric clip",
         artist: song?.artist ?? null,
         template: seg?.template_id ? tmplName.get(seg.template_id) : null,
+        // A "Remix this look" target: the first Look built on this clip's
+        // template, if any. Lets a viewer start a new song pre-set to the look.
+        remixLookId:
+          (seg?.template_id &&
+            LOOKS.find((l) => l.templateName === tmplName.get(seg.template_id!))
+              ?.id) ||
+          null,
       };
     }),
   );
@@ -146,12 +154,24 @@ export default async function ShowcasePage() {
                     preload="metadata"
                   />
                 </div>
-                <div className="p-3">
-                  <p className="text-sm font-semibold text-ink truncate">{c.title}</p>
-                  <p className="text-xs text-ink/50 truncate">
-                    {c.artist ? `${c.artist} · ` : ""}
-                    {c.template ?? "Lyric clip"}
-                  </p>
+                <div className="p-3 space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold text-ink truncate">{c.title}</p>
+                    <p className="text-xs text-ink/50 truncate">
+                      {c.artist ? `${c.artist} · ` : ""}
+                      {c.template ?? "Lyric clip"}
+                    </p>
+                  </div>
+                  <Link
+                    href={
+                      c.remixLookId
+                        ? `/songs/new?look=${c.remixLookId}`
+                        : "/songs/new"
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5 transition-colors"
+                  >
+                    🎨 Remix this look
+                  </Link>
                 </div>
               </li>
             ))}

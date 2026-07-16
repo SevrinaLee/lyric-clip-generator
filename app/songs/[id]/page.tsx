@@ -27,10 +27,13 @@ export const maxDuration = 60;
 
 export default async function SongDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ look?: string }>;
 }) {
   const { id } = await params;
+  const { look: remixLookId } = await searchParams;
   const supabase = await createClient();
 
   const [{ data: song }, { data: { user } }] = await Promise.all([
@@ -257,6 +260,7 @@ export default async function SongDetailPage({
                 songDurationSeconds={song.duration_seconds}
                 unlocked={access.unlocked}
                 accessReason={access.reason}
+                remixLookId={remixLookId ?? null}
               />
             )}
 

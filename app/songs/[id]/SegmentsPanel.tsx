@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ClipSegment, Export, VideoTemplate } from "@/lib/types";
 import type { AccessReason } from "@/lib/access";
-import { queueExport, updateSegmentWindow, regenerateClips } from "./actions";
+import {
+  queueExport,
+  updateSegmentWindow,
+  regenerateClips,
+  duplicateSegment,
+  selectTemplate,
+  updateClipStyle,
+} from "./actions";
+import { LOOKS, availableLooks, isLookPremium } from "@/lib/looks";
 import { PaymentGate } from "./PaymentGate";
 import { TemplatePicker } from "./TemplatePicker";
 import { LooksRow } from "./LooksRow";
@@ -45,6 +54,7 @@ export function SegmentsPanel({
   songDurationSeconds,
   unlocked,
   accessReason,
+  remixLookId = null,
 }: {
   songId: string;
   songTitle: string;
@@ -58,9 +68,18 @@ export function SegmentsPanel({
   songDurationSeconds: number | null;
   unlocked: boolean;
   accessReason: AccessReason;
+  /** Look id carried from a "Remix" deep-link (showcase → new song). */
+  remixLookId?: string | null;
 }) {
+  const paidTier = accessReason === "founder" || accessReason === "paid";
   return (
     <div className="space-y-3">
+      <RemixBanner
+        remixLookId={remixLookId}
+        segmentIds={segments.map((s) => s.id)}
+        templates={templates}
+        paidTier={paidTier}
+      />
       <div className="flex justify-end">
         <RegenerateButton songId={songId} />
       </div>
@@ -122,6 +141,84 @@ function RegenerateButton({ songId }: { songId: string }) {
   );
 }
 
+// Remix banner (v1.7 S7.4): when the user arrived via a "Remix this look"
+// deep-link from the showcase (?look=<id>), offer to apply that Look to every
+// clip in one tap. The Look id is validated against the available Looks; an
+// unknown or premium-locked (for a free song) id simply renders nothing.
+function RemixBanner({
+  remixLookId,
+  segmentIds,
+  templates,
+  paidTier,
+}: {
+  remixLookId: string | null;
+  segmentIds: string[];
+  templates: VideoTemplate[];
+  paidTier: boolean;
+}) {
+  const [done, setDone] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const look = remixLookId
+    ? availableLooks(templates).find((l) => l.id === remixLookId)
+    : undefined;
+  if (!look || dismissed || segmentIds.length === 0) return null;
+  const locked = isLookPremium(look, templates) && !paidTier;
+
+  function apply() {
+    if (!look) return;
+    const template = templates.find((t) => t.name === look.templateName);
+    if (!template) return;
+    const overrides = {
+      ...look.overrides,
+      custom_bg_c0: null,
+      custom_bg_c1: null,
+      custom_caption_color: null,
+    };
+    startTransition(async () => {
+      for (const id of segmentIds) {
+        await selectTemplate(id, template.id);
+        await updateClipStyle(id, overrides);
+      }
+      setDone(true);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-lavender/15 border border-lavender/40 px-4 py-3">
+      <span className="text-sm text-ink">
+        <span className="font-semibold">
+          {look.emoji} Remixing the {look.name} look.
+        </span>{" "}
+        {done
+          ? "Applied to every clip ✓"
+          : locked
+            ? "It’s a premium look — unlock this song to apply it."
+            : "Apply it to every clip in one tap?"}
+      </span>
+      {!done && !locked && (
+        <button
+          onClick={apply}
+          disabled={isPending}
+          className="ml-auto rounded-full bg-ink text-cream px-4 py-1.5 text-xs font-bold hover:bg-ink/85 transition-colors disabled:opacity-50"
+        >
+          {isPending ? "Applying…" : "Apply to all clips"}
+        </button>
+      )}
+      <button
+        onClick={() => setDismissed(true)}
+        className="text-ink/40 hover:text-ink text-sm"
+        title="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function SegmentRow({
   songId,
   songTitle,
@@ -149,8 +246,10 @@ function SegmentRow({
   unlocked: boolean;
   accessReason: AccessReason;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [duplicating, setDuplicating] = useState(false);
   const [status, setStatus] = useState(latestExport?.status);
   const [exportId, setExportId] = useState(latestExport?.id);
   // When null we trust the server export's created_at; set to now() after a
@@ -230,6 +329,21 @@ function SegmentRow({
 
   // Shared by the first export and every later refresh. A failed refresh keeps
   // the previous good clip downloadable rather than dropping to a failed state.
+  function handleDuplicate() {
+    setError(null);
+    setDuplicating(true);
+    startTransition(async () => {
+      try {
+        await duplicateSegment(segment.id);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not duplicate clip");
+      } finally {
+        setDuplicating(false);
+      }
+    });
+  }
+
   function handleRender() {
     setError(null);
     const isFirst = status !== "done";
@@ -465,6 +579,15 @@ function SegmentRow({
             )}
           </>
         )}
+
+        <button
+          onClick={handleDuplicate}
+          disabled={isPending}
+          title="Make a copy of this clip to try a different style"
+          className="rounded-full border border-ink/15 text-ink/60 px-3 py-2 text-xs font-semibold hover:bg-ink/5 transition-colors disabled:opacity-50"
+        >
+          {duplicating ? "Duplicating…" : "⧉ Duplicate"}
+        </button>
 
         {status === "failed" && (
           <span className="text-sm text-mauve">Export failed — try again</span>
