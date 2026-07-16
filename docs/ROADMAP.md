@@ -411,6 +411,69 @@ revisit only with real demand).
 
 ---
 
+## v1.6 depth pass — polish & expand within free-tier limits
+
+Everything here is deliberately scoped to **current infra**: free Vercel (no
+Fluid Compute → synchronous render inside `maxDuration`), free Supabase, and
+**no OpenAI/Whisper key** (rule-based only; accurate captions come from manual
+paste + the tap-timing tool). Nothing below needs a paid plan or an AI token.
+
+### Shipped (batch 1) — variety & guardrails
+- **8 new templates** (12 → 20; migration 0022, data-only via service role).
+  Free solid/pulse on free fonts: Ink, Pulse Sunset, Pulse Mint, Paper.
+  Premium gradient/waveform: Crimson Wave, Aurora, Mono Wave, Bubblegum.
+- **3 new one-tap Looks** (→ 8 total): Bold Dark (free), Crimson + Dream
+  (premium). Premium status stays derived, not flagged.
+- **Tap-timing next-line preview** — shows the upcoming line so users can
+  anticipate the tap (the primary accurate-caption path with no transcription).
+- **Showcase abuse guard** — caps pending (unapproved) submissions per account
+  to limit spam / free-tier storage pressure.
+
+### Backlog — ranked by value (all free-tier compatible)
+1. **Custom colors per clip** *(biggest expand; the one item with a migration)*
+   — a "Custom" background where the user picks their own two gradient colors +
+   caption color. Renderer already accepts hex; this turns a fixed template
+   list into open-ended creativity. Needs nullable per-clip color columns on
+   `clip_segments` (`custom_bg_c0/c1`, `custom_caption_color`) with CHECK-hex
+   constraints + a `tests/security/` §14 (cross-user/anon write rejected;
+   malformed hex rejected server-side). Premium-gate the custom axis if desired.
+2. **"Remix this" from showcase** — a gallery card deep-links into a new song
+   pre-set to that clip's Look. Pure growth loop, no new infra, no schema.
+3. **GIF export** — alternate short-GIF output within the same sync render
+   budget (`ffmpeg` palettegen/paletteuse); reuses the format plumbing.
+4. **Mobile-viewport pass** — the roadmap-flagged real-device check; tighten
+   the new panels (SegmentsPanel, ClipStylePanel, TapTimingTool, account) at
+   `sm`/`md`, verify tap targets + the tap-timing controls on a phone.
+5. **Duplicate-a-clip** — spin style variants off one segment without
+   re-scoring (copy `clip_segments` row + overrides for the same window).
+6. **Showcase pagination / load-more** — keep the public gallery fast as it
+   grows (cursor by `created_at`), stays inside ISR.
+
+### Further expansion ideas (unscoped, still within constraints)
+- **Preset "packs"** — themed bundles of Looks (e.g. "Lo-fi", "Hype",
+  "Wedding") surfaced as a picker; pure code, compounds the template work.
+- **Per-clip emoji / sticker accent** — a single burned-in emoji via libass
+  (vendored emoji font) at a chosen corner; no external assets.
+- **Lyric auto-segmentation hints** — smarter rule-based hook detection
+  (chorus repetition, line density) to improve default clip windows; no AI.
+- **Shareable preview link** — a public, read-only clip preview page (watermarked)
+  for feedback before paying; reuses signed URLs + showcase-style admin read.
+- **Countdown / progress bar overlay** — an ffmpeg-drawn progress element
+  synced to clip duration (common on viral clips); no assets.
+- **"My brand" quick-apply** — one tap to apply a saved brand kit to every clip
+  in a song (Creator tier); leverages existing brand_kits.
+- **Batch export** — queue every segment of a song as a zip in one action,
+  staying within the sync budget by rendering sequentially per request.
+- **Localization of caption fonts** — vendor a CJK/Latin-extended font so
+  non-Latin lyrics render (currently would tofu); registry-only change.
+
+**Verification bar unchanged** — anything touching `clip_segments`
+columns/tables gets a `tests/security/` section (isolation + injection +
+exfiltration) before shipping; render-affecting items get a frame extraction;
+every batch: typecheck → security suite → deploy → `/api/health` smoke.
+
+---
+
 ## Sequencing rationale & dependency graph
 
 ```
