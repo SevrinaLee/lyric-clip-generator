@@ -437,7 +437,12 @@ type ClipStyleUpdates = {
   caption_position?: string | null;
   caption_style_preset?: string | null;
   caption_animation?: string | null;
+  custom_bg_c0?: string | null;
+  custom_bg_c1?: string | null;
+  custom_caption_color?: string | null;
 };
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdates) {
   const supabase = await createClient();
@@ -514,6 +519,19 @@ export async function updateClipStyle(segmentId: string, updates: ClipStyleUpdat
       }
     }
     patch.caption_animation = anim ?? null;
+  }
+
+  // Custom colors (S7.2) — free, but strictly validated server-side so a
+  // tampered write can't inject arbitrary text into the render's filtergraph
+  // (the DB CHECK is a second line of defense). NULL = clear/inherit.
+  for (const key of ["custom_bg_c0", "custom_bg_c1", "custom_caption_color"] as const) {
+    if (key in updates) {
+      const val = updates[key];
+      if (val !== null && val !== undefined && !HEX_COLOR_RE.test(val)) {
+        throw new Error("Colors must be #rrggbb hex");
+      }
+      patch[key] = val ?? null;
+    }
   }
 
   if (Object.keys(patch).length === 0) return;

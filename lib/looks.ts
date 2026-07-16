@@ -12,6 +12,15 @@ import type { ClipStyleOverrides } from "./captionStyles";
 import { FONT_REGISTRY, STYLE_PRESETS, isAnimationPremium } from "./captionStyles";
 import type { VideoTemplate } from "./types";
 
+// A Look bundles the five CAPTION axes (not the freeform custom colors, which
+// are a separate per-clip creative choice — applying a Look clears them).
+type LookAxis =
+  | "caption_font"
+  | "caption_size"
+  | "caption_position"
+  | "caption_style_preset"
+  | "caption_animation";
+
 export type Look = {
   id: string;
   name: string;
@@ -19,7 +28,7 @@ export type Look = {
   /** Resolved to a video_templates row by name at runtime. */
   templateName: string;
   overrides: Required<{
-    [K in keyof ClipStyleOverrides]: NonNullable<ClipStyleOverrides[K]>;
+    [K in LookAxis]: NonNullable<ClipStyleOverrides[K]>;
   }>;
 };
 

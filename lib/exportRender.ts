@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { linesForSegment, attachWordTiming } from "./scoring";
 import { renderClip, WATERMARK_TEXT } from "./render";
 import { resolveClipStyle } from "./captionStyles";
+import { resolveSegmentBackground } from "./backgrounds";
 import { renderDimensions, formatSlug, DEFAULT_FORMAT, type ClipFormat } from "./formats";
 import type { ExportTier } from "./access";
 import type { BrandKit, ClipSegment, Lyric, LyricWord, Song, VideoTemplate } from "./types";
@@ -78,14 +79,17 @@ export async function renderSegmentToBuffer(
   // Template defaults + per-clip overrides (+ brand accent) → the same
   // effective style the browser preview shows.
   const style = resolveClipStyle(template, segment, brand?.accent_hex);
+  // Per-clip custom colors (S7.2) override the template's background; NULL cols
+  // fall back to the template. Same resolver the preview uses, so they agree.
+  const bg = resolveSegmentBackground(template, segment);
   const dims = renderDimensions(format, tier.label === "paid");
   return renderClip({
     audioUrl: song.audio_url,
     startMs: segment.start_ms,
     endMs: segment.end_ms,
     lines: renderLines,
-    primaryColor: template.primary_color,
-    backgroundStyle: template.background_style,
+    primaryColor: bg.primaryColor,
+    backgroundStyle: bg.backgroundStyle,
     watermarkText,
     logoBuffer,
     brandAccent: brand?.accent_hex ?? null,

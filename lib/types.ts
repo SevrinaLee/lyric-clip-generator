@@ -68,6 +68,12 @@ export type ClipSegment = {
   caption_position?: "center" | "lower" | null;
   caption_style_preset?: "box" | "outline" | "outline-yellow" | null;
   caption_animation?: "fade" | "bounce" | "wordpop" | "karaoke" | null;
+  // Per-clip custom colors (migration 0023); null = inherit the template.
+  // #rrggbb hex, DB-CHECK-constrained. c0+c1 override the background (solid if
+  // equal, else a gradient); caption_color overrides the caption text color.
+  custom_bg_c0?: string | null;
+  custom_bg_c1?: string | null;
+  custom_caption_color?: string | null;
   hook_score: number | null;
   hook_score_source: string | null;
   hook_score_confidence: number | null;

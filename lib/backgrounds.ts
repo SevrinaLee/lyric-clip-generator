@@ -49,6 +49,45 @@ export function parseBackgroundStyle(
   return { type: "solid", color: primaryColor };
 }
 
+export function isHexColor(v: string | null | undefined): v is string {
+  return typeof v === "string" && HEX_RE.test(v);
+}
+
+/**
+ * Per-clip custom background (v1.7 S7.2). Two custom colors override the
+ * template's background_style: identical colors → a flat `solid`, otherwise a
+ * two-stop `gradient`. Returns null when the clip has no (valid) custom pair,
+ * so the caller falls back to the template. Shared by the render and the
+ * preview so both agree — same pattern as the rest of this module.
+ */
+export function customBackgroundStyle(
+  c0: string | null | undefined,
+  c1: string | null | undefined,
+): string | null {
+  if (!isHexColor(c0) || !isHexColor(c1)) return null;
+  return c0.toLowerCase() === c1.toLowerCase() ? "solid" : `gradient:${c0}:${c1}`;
+}
+
+/**
+ * The effective background for a clip: its custom colors if set (validated),
+ * else the template's. `primaryColor` is what a `solid` should fill with.
+ */
+export function resolveSegmentBackground(
+  template: { background_style?: string | null; primary_color: string },
+  segment?: { custom_bg_c0?: string | null; custom_bg_c1?: string | null } | null,
+): { backgroundStyle: string | null; primaryColor: string } {
+  const custom = customBackgroundStyle(segment?.custom_bg_c0, segment?.custom_bg_c1);
+  if (custom) {
+    // For a custom solid, fill with c0; for a custom gradient, primaryColor is
+    // unused by the parser but c0 is a sensible value to carry.
+    return { backgroundStyle: custom, primaryColor: segment!.custom_bg_c0! };
+  }
+  return {
+    backgroundStyle: template.background_style ?? null,
+    primaryColor: template.primary_color,
+  };
+}
+
 /** Multiply a #rrggbb hex's channels by `factor` (0..1) to darken it. */
 export function darkenHex(hex: string, factor: number): string {
   const n = parseInt(hex.replace("#", ""), 16);

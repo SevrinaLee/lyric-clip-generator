@@ -2,7 +2,11 @@
 
 import { useRef, useState } from "react";
 import type { VideoTemplate } from "@/lib/types";
-import { cssBackground, parseBackgroundStyle } from "@/lib/backgrounds";
+import {
+  cssBackground,
+  parseBackgroundStyle,
+  resolveSegmentBackground,
+} from "@/lib/backgrounds";
 import {
   wordSchedule,
   type CaptionAnimation,
@@ -34,6 +38,7 @@ export function ClipPreviewPlayer({
   lines,
   template,
   clipStyle,
+  bgColors,
   format = DEFAULT_FORMAT,
 }: {
   audioUrl: string;
@@ -44,6 +49,9 @@ export function ClipPreviewPlayer({
   /** Effective caption style (template + per-clip overrides), resolved by
    *  lib/captionStyles.ts — the same object the export render consumes. */
   clipStyle: ResolvedClipStyle;
+  /** Per-clip custom background colors (S7.2); override the template when set.
+   *  Same resolver the render uses, so preview/export agree. */
+  bgColors?: { custom_bg_c0?: string | null; custom_bg_c1?: string | null };
   /** Export aspect ratio, so the preview frame matches the output. */
   format?: ClipFormat;
 }) {
@@ -113,7 +121,10 @@ export function ClipPreviewPlayer({
         className={`relative ${FORMAT_BOX[format]} shrink-0 overflow-hidden rounded-xl`}
         style={{
           background: cssBackground(
-            parseBackgroundStyle(template.background_style, template.primary_color),
+            (() => {
+              const bg = resolveSegmentBackground(template, bgColors);
+              return parseBackgroundStyle(bg.backgroundStyle, bg.primaryColor);
+            })(),
           ),
         }}
       >

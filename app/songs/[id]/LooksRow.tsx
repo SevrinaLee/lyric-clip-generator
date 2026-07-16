@@ -45,11 +45,19 @@ export function LooksRow({
       return;
     }
     setError(null);
-    onApply(template.id, look.overrides);
+    // A Look is a complete caption look; applying it also clears any freeform
+    // custom colors (S7.2) so the clip matches the Look exactly.
+    const applied: ClipStyleOverrides = {
+      ...look.overrides,
+      custom_bg_c0: null,
+      custom_bg_c1: null,
+      custom_caption_color: null,
+    };
+    onApply(template.id, applied);
     startTransition(async () => {
       try {
         await selectTemplate(segmentId, template.id);
-        await updateClipStyle(segmentId, look.overrides);
+        await updateClipStyle(segmentId, applied);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not apply look");
       }

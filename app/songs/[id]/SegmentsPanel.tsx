@@ -169,6 +169,10 @@ function SegmentRow({
     caption_position: segment.caption_position ?? null,
     caption_style_preset: segment.caption_style_preset ?? null,
     caption_animation: segment.caption_animation ?? null,
+    // Custom colors (S7.2) — background pair + caption color; null = inherit.
+    custom_bg_c0: segment.custom_bg_c0 ?? null,
+    custom_bg_c1: segment.custom_bg_c1 ?? null,
+    custom_caption_color: segment.custom_caption_color ?? null,
   });
   const [format, setFormat] = useState<ClipFormat>(DEFAULT_FORMAT);
   // Local clip window (optimistic) so nudges update the preview instantly;
@@ -350,6 +354,7 @@ function SegmentRow({
           lines={lines}
           template={selectedTemplate}
           clipStyle={clipStyle}
+          bgColors={overrides}
           format={format}
         />
       )}

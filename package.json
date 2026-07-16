@@ -12,7 +12,8 @@
     "verify:captions": "tsx scripts/verify-captions.ts",
     "verify:words": "tsx scripts/verify-words.ts",
     "verify:brand": "tsx scripts/verify-brand.ts",
-    "verify:donation": "tsx scripts/verify-donation.ts"
+    "verify:donation": "tsx scripts/verify-donation.ts",
+    "verify:colors": "tsx scripts/verify-custom-colors.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",

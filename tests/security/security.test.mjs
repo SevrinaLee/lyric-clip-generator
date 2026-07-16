@@ -860,6 +860,101 @@ describe("13. Public showcase (0021)", () => {
   });
 });
 
+// ── 14. PER-CLIP CUSTOM COLORS (migration 0023) ────────────────────────────
+// Same guarantees as §6/§7 for custom_bg_c0/c1 + custom_caption_color: only the
+// owner can write them, and the DB CHECK rejects anything that isn't #rrggbb
+// hex — so a tampered write can never inject text into the render filtergraph.
+describe("14. Per-clip custom colors (0023)", () => {
+  let segmentId;
+
+  before(async () => {
+    const { data: seg, error } = await ctx.a.client
+      .from("clip_segments")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        label: "Hook",
+        start_ms: 0,
+        end_ms: 8000,
+        platform: "tiktok",
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A should insert own clip segment");
+    segmentId = seg.id;
+  });
+
+  it("positive control: A can set own custom colors", async () => {
+    const { data, error } = await ctx.a.client
+      .from("clip_segments")
+      .update({
+        custom_bg_c0: "#ff0000",
+        custom_bg_c1: "#0000ff",
+        custom_caption_color: "#ffffff",
+      })
+      .eq("id", segmentId)
+      .select("custom_bg_c0, custom_bg_c1, custom_caption_color");
+    assert.equal(error, null);
+    assert.equal(data?.[0]?.custom_bg_c0, "#ff0000");
+    assert.equal(data?.[0]?.custom_bg_c1, "#0000ff");
+    assert.equal(data?.[0]?.custom_caption_color, "#ffffff");
+  });
+
+  it("B cannot modify A's custom colors", async () => {
+    const { data } = await ctx.b.client
+      .from("clip_segments")
+      .update({ custom_bg_c0: "#000000" })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "update must affect zero rows");
+
+    const { data: check } = await admin
+      .from("clip_segments")
+      .select("custom_bg_c0")
+      .eq("id", segmentId)
+      .single();
+    assert.equal(check.custom_bg_c0, "#ff0000", "unchanged");
+  });
+
+  it("anon cannot modify custom colors", async () => {
+    const anon = anonClient(env);
+    const { data } = await anon
+      .from("clip_segments")
+      .update({ custom_caption_color: "#123456" })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "anon update must affect zero rows");
+  });
+
+  it("DB CHECK rejects non-hex / injected color even from the owner", async () => {
+    for (const bad of [
+      "red",
+      "#fff",
+      "#gggggg",
+      "#ff0000; drop table songs;--",
+      "rgba(0,0,0,1)",
+    ]) {
+      const { error } = await ctx.a.client
+        .from("clip_segments")
+        .update({ custom_bg_c0: bad })
+        .eq("id", segmentId);
+      assert.ok(error, `junk color "${bad}" must be rejected by the check`);
+    }
+
+    const { count } = await admin
+      .from("songs")
+      .select("id", { count: "exact", head: true });
+    assert.ok((count ?? 0) > 0, "songs table must still exist");
+
+    const { data: check } = await admin
+      .from("clip_segments")
+      .select("custom_bg_c0")
+      .eq("id", segmentId)
+      .single();
+    assert.equal(check.custom_bg_c0, "#ff0000", "value unchanged after rejects");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

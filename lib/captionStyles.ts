@@ -242,7 +242,14 @@ export type ResolvedClipStyle = {
 // and is what the UI/state and resolveClipStyle pass around.
 export type ClipStyleOverrides = Pick<
   ClipSegment,
-  "caption_font" | "caption_size" | "caption_position" | "caption_style_preset" | "caption_animation"
+  | "caption_font"
+  | "caption_size"
+  | "caption_position"
+  | "caption_style_preset"
+  | "caption_animation"
+  | "custom_bg_c0"
+  | "custom_bg_c1"
+  | "custom_caption_color"
 >;
 
 type StyleSegment = ClipStyleOverrides;
@@ -293,11 +300,28 @@ export function resolveClipStyle(
   const pos = POSITION_PRESETS[position];
   const preset = STYLE_PRESETS[stylePreset];
 
-  // Brand-kit accent overrides the yellow-emphasis fill (paid renders only).
-  const validAccent = brandAccent && /^#[0-9a-fA-F]{6}$/.test(brandAccent);
-  const useAccent = validAccent && stylePreset === "outline-yellow";
-  const primaryAss = useAccent ? hexToAss(brandAccent!) : preset.primary;
-  const primaryPreview = useAccent ? brandAccent! : preset.previewColor;
+  // Caption colour precedence (highest first):
+  //   1. per-clip custom_caption_color — an explicit free user choice (S7.2),
+  //      applies to any preset;
+  //   2. brand-kit accent — paid, and only for the yellow-emphasis preset;
+  //   3. the style preset's own colour.
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const customColor =
+    segment?.custom_caption_color && HEX.test(segment.custom_caption_color)
+      ? segment.custom_caption_color
+      : null;
+  const validAccent = brandAccent && HEX.test(brandAccent);
+  const useAccent = !customColor && validAccent && stylePreset === "outline-yellow";
+  const primaryAss = customColor
+    ? hexToAss(customColor)
+    : useAccent
+      ? hexToAss(brandAccent!)
+      : preset.primary;
+  const primaryPreview = customColor
+    ? customColor
+    : useAccent
+      ? brandAccent!
+      : preset.previewColor;
 
   return {
     fontName,
