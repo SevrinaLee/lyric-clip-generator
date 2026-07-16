@@ -53,6 +53,15 @@ export async function POST(request: Request) {
       const session = event.data.object as Stripe.Checkout.Session;
       const paymentId = session.metadata?.paymentId;
 
+      // Donations (tip jar, v1.7) carry `donation:"1"` and NO paymentId, so the
+      // payment path below is skipped entirely — a tip can never flip a song to
+      // paid or grant Creator. Just acknowledge it for observability.
+      if (session.metadata?.donation === "1") {
+        console.log(
+          `[stripe/webhooks] donation received: ${session.amount_total ?? "?"} ${session.currency ?? ""} (grants nothing)`,
+        );
+      }
+
       // For async methods (PayNow, GrabPay) `completed` arrives while the
       // payment is still "unpaid" — leave the row pending and let the
       // async_payment_succeeded event flip it.

@@ -13,6 +13,7 @@ export const primaryItems: NavItem[] = [
   { href: "/songs", label: "My songs", icon: "music" },
   { href: "/clips", label: "My clips", icon: "film" },
   { href: "/pricing", label: "Pricing", icon: "tag" },
+  { href: "/support", label: "Support", icon: "heart" },
   { href: "/faq", label: "FAQ", icon: "help" },
 ];
 

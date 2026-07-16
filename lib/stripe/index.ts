@@ -116,6 +116,63 @@ export async function createSongCheckoutSession({
   return stripe.checkout.sessions.create(params, stripeAccountOptions());
 }
 
+// ─── Donations (tip jar) ────────────────────────────────────────────────────
+//
+// A one-off "support the app" payment that is deliberately DECOUPLED from the
+// access model: it carries no `paymentId`/`songId`, so the webhook's payment
+// path never runs and it can never flip a song to paid or grant Creator. The
+// only record of truth is Stripe itself (metadata `donation:"1"`). Amounts are
+// validated server-side to a sane range; the client value is never trusted.
+
+export const DONATION_MIN_CENTS = 100; // S$1
+export const DONATION_MAX_CENTS = 50000; // S$500
+export const DONATION_PRESETS_CENTS = [300, 500, 1000] as const; // S$3 / 5 / 10
+
+/**
+ * Clamp/validate a client-supplied donation amount. Returns integer cents, or
+ * null if the input is not a finite integer within [MIN, MAX]. Rejecting
+ * (rather than silently clamping) means a tampered/injected value fails loudly.
+ */
+export function validateDonationCents(input: unknown): number | null {
+  if (typeof input !== "number" || !Number.isFinite(input)) return null;
+  if (!Number.isInteger(input)) return null;
+  if (input < DONATION_MIN_CENTS || input > DONATION_MAX_CENTS) return null;
+  return input;
+}
+
+export async function createDonationCheckoutSession({
+  amountCents,
+  userId,
+  successUrl,
+  cancelUrl,
+}: {
+  amountCents: number;
+  userId?: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const params: Stripe.Checkout.SessionCreateParams = {
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: CURRENCY,
+          product_data: { name: "Support Lyric Clip Generator 💛" },
+          unit_amount: amountCents,
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    submit_type: "donate",
+    // No paymentId/songId here — this must never satisfy evaluateSongAccess.
+    metadata: { donation: "1", ...(userId ? { userId } : {}) },
+  };
+
+  return stripe.checkout.sessions.create(params, stripeAccountOptions());
+}
+
 // ─── Billing portal ───────────────────────────────────────────────────────────
 
 export async function createPortalSession({

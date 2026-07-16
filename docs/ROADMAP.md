@@ -1,4 +1,4 @@
-# Product roadmap — v1.3 → v1.6 (sprint-broken spec)
+# Product roadmap — v1.3 → v1.7 (sprint-broken spec)
 
 > Written 2026-07-14 against v1.2 (clip aesthetics complete). Every sprint is
 > independently shippable and ends with: typecheck clean, `npm run
@@ -429,48 +429,113 @@ paste + the tap-timing tool). Nothing below needs a paid plan or an AI token.
 - **Showcase abuse guard** — caps pending (unapproved) submissions per account
   to limit spam / free-tier storage pressure.
 
-### Backlog — ranked by value (all free-tier compatible)
-1. **Custom colors per clip** *(biggest expand; the one item with a migration)*
-   — a "Custom" background where the user picks their own two gradient colors +
-   caption color. Renderer already accepts hex; this turns a fixed template
-   list into open-ended creativity. Needs nullable per-clip color columns on
-   `clip_segments` (`custom_bg_c0/c1`, `custom_caption_color`) with CHECK-hex
-   constraints + a `tests/security/` §14 (cross-user/anon write rejected;
-   malformed hex rejected server-side). Premium-gate the custom axis if desired.
-2. **"Remix this" from showcase** — a gallery card deep-links into a new song
-   pre-set to that clip's Look. Pure growth loop, no new infra, no schema.
-3. **GIF export** — alternate short-GIF output within the same sync render
-   budget (`ffmpeg` palettegen/paletteuse); reuses the format plumbing.
-4. **Mobile-viewport pass** — the roadmap-flagged real-device check; tighten
-   the new panels (SegmentsPanel, ClipStylePanel, TapTimingTool, account) at
-   `sm`/`md`, verify tap targets + the tap-timing controls on a phone.
-5. **Duplicate-a-clip** — spin style variants off one segment without
-   re-scoring (copy `clip_segments` row + overrides for the same window).
-6. **Showcase pagination / load-more** — keep the public gallery fast as it
-   grows (cursor by `created_at`), stays inside ISR.
+This depth pass is formalized into numbered sprints as **v1.7** below.
 
-### Further expansion ideas (unscoped, still within constraints)
-- **Preset "packs"** — themed bundles of Looks (e.g. "Lo-fi", "Hype",
-  "Wedding") surfaced as a picker; pure code, compounds the template work.
-- **Per-clip emoji / sticker accent** — a single burned-in emoji via libass
-  (vendored emoji font) at a chosen corner; no external assets.
-- **Lyric auto-segmentation hints** — smarter rule-based hook detection
-  (chorus repetition, line density) to improve default clip windows; no AI.
-- **Shareable preview link** — a public, read-only clip preview page (watermarked)
-  for feedback before paying; reuses signed URLs + showcase-style admin read.
-- **Countdown / progress bar overlay** — an ffmpeg-drawn progress element
-  synced to clip duration (common on viral clips); no assets.
-- **"My brand" quick-apply** — one tap to apply a saved brand kit to every clip
-  in a song (Creator tier); leverages existing brand_kits.
-- **Batch export** — queue every segment of a song as a zip in one action,
-  staying within the sync budget by rendering sequentially per request.
-- **Localization of caption fonts** — vendor a CJK/Latin-extended font so
-  non-Latin lyrics render (currently would tofu); registry-only change.
+---
 
-**Verification bar unchanged** — anything touching `clip_segments`
-columns/tables gets a `tests/security/` section (isolation + injection +
-exfiltration) before shipping; render-affecting items get a frame extraction;
-every batch: typecheck → security suite → deploy → `/api/health` smoke.
+## v1.7 — Creativity, generosity & polish (the outstanding roadmap)
+
+The remaining work, sprinted. Same constraints throughout: free Vercel
+(synchronous render inside `maxDuration`, no Fluid Compute), free Supabase,
+**no OpenAI/Whisper token**. Migrations continue from **0023**. Every sprint
+ends at the standing verification bar and **updates the user-journey diagram**
+(`docs/build-doc/generate.mjs` status maps) so the diagram is an accurate
+snapshot at each shipped version.
+
+### Sprint 7.1 — Support / Donate (fast, no moderation surface)
+**Goal:** let happy users chip in without subscribing — a tip jar.
+- New `/support` page: preset amounts (S$3 / S$5 / S$10) + custom amount.
+- Extend the Stripe layer with a **donation** Checkout Session in `payment`
+  mode, inline `price_data` (SGD), amount **validated server-side** (integer
+  cents, min S$1 / max S$500 — never trust the client beyond bounds).
+- Record into `payments`/`purchases` with a `donation` marker (reportable).
+- **Hard rule:** a donation must NOT flip any song to `paid` or grant Creator —
+  it never touches `evaluateSongAccess`. Keeps the access model honest.
+- Works in both Stripe modes (standalone + platform-connect).
+- **Journey:** add a **"Support / donate"** node (→ `live` when shipped).
+- **No schema change**, so no new `tests/security/` section; add a unit assertion
+  that the amount validator rejects out-of-range / non-integer / injected input.
+**Don't:** grant anything in exchange; store card data; recurring donations.
+
+### Sprint 7.2 — Custom colors per clip (biggest creative expand)
+**Goal:** open-ended color instead of a fixed template list.
+- `migration 0023_clip_custom_colors.sql`: nullable, CHECK-hex columns on
+  `clip_segments` — `custom_bg_c0`, `custom_bg_c1`, `custom_caption_color`
+  (`~ '^#[0-9a-fA-F]{6}$'`). NULL = inherit. RLS from 0004 already owner-scopes.
+- `lib/backgrounds.ts`: `custom:<c0>:<c1>` grammar term (realized like
+  `gradient`), shared preview + render.
+- `updateClipStyle`: accept + validate the three hex values server-side.
+- `ClipStylePanel`: color pickers (native `<input type=color>`), "Reset".
+- **Free/premium:** custom colors **free** (creativity is the taste of value);
+  keep premium on fonts/animations/backgrounds already gated.
+- **`tests/security/` §14:** cross-user/anon write rejected; malformed/injected
+  hex rejected server-side (not just UI).
+**Don't:** full theming JSON; gradient angle/stops UI (two-stop only).
+
+### Sprint 7.3 — Custom image backgrounds (Creator-gated)
+**Goal:** a user's own photo behind the captions — the most-requested "make it
+mine". Cheapest render of all (static composite), but the one real moderation
+surface, so gated + kept out of the public showcase.
+- `migration 0024_clip_bg_image.sql`: `clip_segments.custom_bg_image_path`
+  (nullable text) + storage bucket `clip-backgrounds` with **owner-only RLS**
+  (path prefix `<uid>/`), mirroring `brand-logos`.
+- Upload server action reusing [`sniffImage`](lib/imageSniff.ts): magic-byte
+  PNG/JPEG only, ≤1MB, re-encode on render **strips EXIF/GPS**.
+- `lib/render.ts`: `image:<path>` background → download buffer, `scale=…:
+  force_original_aspect_ratio=increase,crop` to fill the format, captions over.
+- **Creator-tier gated** (`isPaidAccount`), enforced in the action + render.
+- **Showcase exclusion:** clips using a custom image are **not** auto-eligible
+  for the public gallery (or route through existing manual approval only).
+- Storage hygiene: one active bg per user (replace-in-place), delete on clear.
+- **`tests/security/` §15:** cross-user/anon upload + read rejected; non-image
+  bytes rejected; unpaid account rejected server-side; path traversal rejected.
+- **Journey:** the **"Template + preview"** node gains a "custom bg" capability
+  note (stays `live`).
+**Don't:** video-loop backgrounds (needs render headroom we don't have — stays
+in S6.3 deferred); un-gated free uploads (storage + moderation blow-up).
+
+### Sprint 7.4 — Remix from showcase + duplicate-a-clip (growth + iteration)
+**Goal:** close the showcase loop and make style A/B fast.
+- **Remix:** each public showcase card gets a "Remix this Look" action that
+  deep-links into the create flow with the Look pre-selected (query param,
+  validated against `availableLooks`). Pure growth loop, no schema.
+- **Duplicate-a-clip:** copy a `clip_segments` row + its overrides for the same
+  window (no re-score), so users can keep one style and vary another.
+- **`tests/security/`:** duplicate action re-checks ownership (can't clone into
+  someone else's song); remix param can't inject a template id.
+**Don't:** cross-account remix of the actual audio (copyright); public editing.
+
+### Sprint 7.5 — GIF export (new output surface)
+**Goal:** a short looping GIF for surfaces that want it.
+- Alternate output in `renderSegmentToBuffer`: `palettegen` → `paletteuse`
+  two-pass, capped duration/fps to stay inside the sync budget and file size.
+- Extend `exportStoragePath` + the format/plumbing; download route serves it.
+- **Free/premium:** GIF free at watermarked/reduced size, HD-clean GIF paid
+  (mirror the MP4 ladder).
+- **Verify:** render a GIF, inspect frames + file size; measure wall-time.
+**Don't:** APNG/WebP animation zoo; long GIFs (size explosion).
+
+### Sprint 7.6 — Mobile-viewport pass + showcase pagination (polish)
+**Goal:** flip the long-standing `mobile: device` journey node to `live` and
+keep the gallery fast.
+- Drive the app at phone widths in the in-app browser (`resize_window` mobile):
+  tighten `SegmentsPanel`, `ClipStylePanel`, `TapTimingTool`, `/account`,
+  `/showcase`, nav drawer — tap targets, overflow, the tap-timing controls.
+- **Showcase pagination:** cursor `load-more` by `created_at`, staying inside
+  ISR; keeps the public page fast as entries grow.
+- **Journey:** `mobile` node **`device` → `live`** (verified on real viewport).
+**Don't:** a separate mobile app; gesture rework.
+
+### Carried-over / deferred (documented, not buildable on current infra)
+- **S6.2 — Direct posting (TikTok)** — long pole; needs external app-review that
+  can't complete in-build. Ships as flag-gated stub only; revisit when approved.
+- **S6.3 — Video-loop backgrounds** — needs the background-render headroom that
+  the deferred S5.1 pipeline would provide (blocked by no Fluid Compute).
+
+### Further ideas parked (still within constraints, not yet sprinted)
+Preset "packs", per-clip emoji accent, smarter rule-based hook detection,
+shareable watermarked preview link, countdown/progress-bar overlay, "apply my
+brand to every clip", batch/zip export, CJK/Latin-extended caption font.
 
 ---
 

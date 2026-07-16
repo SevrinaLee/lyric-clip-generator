@@ -9,6 +9,7 @@ export type IconName =
   | "logout"
   | "menu"
   | "close"
+  | "heart"
   | "film";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -46,6 +47,9 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   menu: <path d="M3 6h18M3 12h18M3 18h18" />,
+  heart: (
+    <path d="M12 21s-7.5-4.6-10-9.3C.6 8.8 2 5.5 5.2 5.5c1.9 0 3.1 1 3.8 2 .7-1 1.9-2 3.8-2 3.2 0 4.6 3.3 3.2 6.2C19.5 16.4 12 21 12 21Z" />
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   film: (
     <>
