@@ -265,6 +265,7 @@ export async function renderClip({
   watermarkText = null,
   logoBuffer = null,
   brandAccent = null,
+  bgImageBuffer = null,
   width = DESIGN_W,
   height = DESIGN_H,
   kind = "mp4",
@@ -285,6 +286,10 @@ export async function renderClip({
   /** Brand accent (#rrggbb) — overrides waveform colour; caption fill is
    *  handled by the resolved `caption`. */
   brandAccent?: string | null;
+  /** Custom image background (PNG/JPEG bytes). When set, it replaces the
+   *  template/gradient background — scaled to fill and cropped. Paid renders
+   *  only (Creator-gated); the caller decides whether to pass it. */
+  bgImageBuffer?: Buffer | null;
   width?: number;
   height?: number;
   /** "mp4" (default, with audio) or "gif" (short, silent, palette-optimized). */
@@ -298,6 +303,7 @@ export async function renderClip({
   const outPath = path.join(dir, isGif ? "out.gif" : "out.mp4");
   const assPath = path.join(dir, "captions.ass");
   const logoPath = path.join(dir, "logo.img");
+  const bgImagePath = path.join(dir, "bg.img");
 
   try {
     const res = await fetch(audioUrl);
@@ -325,22 +331,45 @@ export async function renderClip({
     // tier is smaller and slightly more compressed.
     const crf = width >= DESIGN_W ? "20" : "28";
 
-    const bgSrc = backgroundSource(backgroundStyle, primaryColor, width, height, brandAccent);
-    // Compose the (optional) background filter chain, then burn captions over
-    // whichever label carries the finished background.
-    const bgLabel = bgSrc.filterChain ? "[bg]" : "[1:v]";
-    let filterComplex =
-      (bgSrc.filterChain ? `${bgSrc.filterChain};` : "") +
-      `${bgLabel}ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`;
-
-    const inputs = [
-      "-ss", String(startSeconds),
-      "-t", String(durationSeconds),
-      "-i", sourcePath,
-      "-f", "lavfi",
-      "-t", String(durationSeconds),
-      "-i", bgSrc.lavfiInput,
-    ];
+    // Custom image background (S7.3) replaces the template/gradient entirely:
+    // a looped still, scaled to cover and cropped to the exact output size.
+    // Re-encoding strips any EXIF/GPS metadata the source image carried.
+    let filterComplex: string;
+    let inputs: string[];
+    let audioMap: string;
+    if (bgImageBuffer) {
+      await writeFile(bgImagePath, bgImageBuffer);
+      filterComplex =
+        `[1:v]scale=${width}:${height}:force_original_aspect_ratio=increase,` +
+        `crop=${width}:${height},setsar=1[bg];` +
+        `[bg]ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`;
+      inputs = [
+        "-ss", String(startSeconds),
+        "-t", String(durationSeconds),
+        "-i", sourcePath,
+        "-loop", "1",
+        "-t", String(durationSeconds),
+        "-i", bgImagePath,
+      ];
+      audioMap = "0:a";
+    } else {
+      const bgSrc = backgroundSource(backgroundStyle, primaryColor, width, height, brandAccent);
+      // Compose the (optional) background filter chain, then burn captions over
+      // whichever label carries the finished background.
+      const bgLabel = bgSrc.filterChain ? "[bg]" : "[1:v]";
+      filterComplex =
+        (bgSrc.filterChain ? `${bgSrc.filterChain};` : "") +
+        `${bgLabel}ass='${assFilterPath}':fontsdir='${fontsDirPath}'[v]`;
+      inputs = [
+        "-ss", String(startSeconds),
+        "-t", String(durationSeconds),
+        "-i", sourcePath,
+        "-f", "lavfi",
+        "-t", String(durationSeconds),
+        "-i", bgSrc.lavfiInput,
+      ];
+      audioMap = bgSrc.audioMap;
+    }
 
     // Brand logo (paid renders): scale to ~8% of the output height and overlay
     // bottom-right. The logo is input [2]; captions are already burned into [v].
@@ -360,8 +389,8 @@ export async function renderClip({
       // A waveform background splits [0:a] into an [aud] output for muxing;
       // since a GIF has no audio, that label would dangle and fail the graph —
       // sink it explicitly.
-      if (bgSrc.audioMap.startsWith("[")) {
-        filterComplex += `;${bgSrc.audioMap}anullsink`;
+      if (audioMap.startsWith("[")) {
+        filterComplex += `;${audioMap}anullsink`;
       }
       filterComplex +=
         `;${videoLabel}fps=${GIF_FPS},scale=${GIF_WIDTH}:-2:flags=lanczos,` +
@@ -383,7 +412,7 @@ export async function renderClip({
       ...inputs,
       "-filter_complex", filterComplex,
       "-map", videoLabel,
-      "-map", bgSrc.audioMap,
+      "-map", audioMap,
       "-c:v", "libx264",
       "-crf", crf,
       "-pix_fmt", "yuv420p",

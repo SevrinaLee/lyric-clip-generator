@@ -77,6 +77,16 @@ export async function renderSegmentToBuffer(
     if (blob) logoBuffer = Buffer.from(await blob.arrayBuffer());
   }
 
+  // Custom image background (S7.3) — Creator-gated, so only on paid renders.
+  // Replaces the template/gradient/color background entirely.
+  let bgImageBuffer: Buffer | null = null;
+  if (tier.label === "paid" && segment.custom_bg_image_path) {
+    const { data: blob } = await supabase.storage
+      .from("clip-backgrounds")
+      .download(segment.custom_bg_image_path);
+    if (blob) bgImageBuffer = Buffer.from(await blob.arrayBuffer());
+  }
+
   // Template defaults + per-clip overrides (+ brand accent) → the same
   // effective style the browser preview shows.
   const style = resolveClipStyle(template, segment, brand?.accent_hex);
@@ -94,6 +104,7 @@ export async function renderSegmentToBuffer(
     watermarkText,
     logoBuffer,
     brandAccent: brand?.accent_hex ?? null,
+    bgImageBuffer,
     width: dims.width,
     height: dims.height,
     caption: style.ass,

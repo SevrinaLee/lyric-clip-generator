@@ -50,6 +50,7 @@ export function SegmentsPanel({
   templates,
   linesBySegment,
   exportsBySegment,
+  bgImageBySegment,
   lyricsUpdatedAt,
   songDurationSeconds,
   unlocked,
@@ -64,6 +65,7 @@ export function SegmentsPanel({
   templates: VideoTemplate[];
   linesBySegment: Map<string, PreviewLine[]>;
   exportsBySegment: Map<string, Export>;
+  bgImageBySegment: Map<string, string>;
   lyricsUpdatedAt: string | null;
   songDurationSeconds: number | null;
   unlocked: boolean;
@@ -95,6 +97,7 @@ export function SegmentsPanel({
             templates={templates}
             lines={linesBySegment.get(segment.id) ?? []}
             latestExport={exportsBySegment.get(segment.id)}
+            bgImageUrl={bgImageBySegment.get(segment.id) ?? null}
             lyricsUpdatedAt={lyricsUpdatedAt}
             songDurationSeconds={songDurationSeconds}
             unlocked={unlocked}
@@ -228,6 +231,7 @@ function SegmentRow({
   templates,
   lines,
   latestExport,
+  bgImageUrl,
   lyricsUpdatedAt,
   songDurationSeconds,
   unlocked,
@@ -241,6 +245,7 @@ function SegmentRow({
   templates: VideoTemplate[];
   lines: PreviewLine[];
   latestExport?: Export;
+  bgImageUrl: string | null;
   lyricsUpdatedAt: string | null;
   songDurationSeconds: number | null;
   unlocked: boolean;
@@ -456,6 +461,8 @@ function SegmentRow({
           template={selectedTemplate}
           initial={overrides}
           paidTier={accessReason === "founder" || accessReason === "paid"}
+          creatorTier={accessReason === "founder" || accessReason === "subscriber"}
+          hasBgImage={!!bgImageUrl}
           onChange={setOverrides}
         />
       )}
@@ -469,6 +476,7 @@ function SegmentRow({
           template={selectedTemplate}
           clipStyle={clipStyle}
           bgColors={overrides}
+          bgImageUrl={bgImageUrl}
           format={format}
         />
       )}

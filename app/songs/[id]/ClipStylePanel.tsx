@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { VideoTemplate } from "@/lib/types";
 import {
   FONT_REGISTRY,
@@ -23,7 +24,7 @@ import {
   parseBackgroundStyle,
   resolveSegmentBackground,
 } from "@/lib/backgrounds";
-import { updateClipStyle } from "./actions";
+import { updateClipStyle, updateClipBgImage, clearClipBgImage } from "./actions";
 
 const SIZE_LABEL: Record<CaptionSize, string> = { sm: "S", md: "M", lg: "L" };
 const POSITION_LABEL: Record<CaptionPosition, string> = {
@@ -76,18 +77,67 @@ export function ClipStylePanel({
   template,
   initial,
   paidTier,
+  creatorTier = false,
+  hasBgImage = false,
   onChange,
 }: {
   segmentId: string;
   template: VideoTemplate;
   initial: ClipStyleOverrides;
   paidTier: boolean;
+  /** Founder/subscriber — gates the custom image background (S7.3). */
+  creatorTier?: boolean;
+  /** Whether this clip currently has a custom image background. */
+  hasBgImage?: boolean;
   onChange?: (overrides: ClipStyleOverrides) => void;
 }) {
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [ov, setOv] = useState<ClipStyleOverrides>(initial);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bgBusy, setBgBusy] = useState(false);
   const [, startTransition] = useTransition();
+
+  function handleBgImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    if (file.size > 1_000_000) {
+      setError("Image must be 1MB or smaller.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    const fd = new FormData();
+    fd.append("image", file);
+    setBgBusy(true);
+    startTransition(async () => {
+      try {
+        await updateClipBgImage(segmentId, fd);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not set background");
+      } finally {
+        setBgBusy(false);
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    });
+  }
+
+  function handleClearBgImage() {
+    setError(null);
+    setBgBusy(true);
+    startTransition(async () => {
+      try {
+        await clearClipBgImage(segmentId);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not clear background");
+      } finally {
+        setBgBusy(false);
+      }
+    });
+  }
 
   const eff = resolveClipStyle(template, ov);
   const inheritedFont =
@@ -311,6 +361,46 @@ export function ClipStylePanel({
                 </button>
               )}
             </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 border-t border-ink/10 pt-2">
+            <span className="text-[11px] text-ink/55">
+              Image background {creatorTier ? "" : "★"}
+            </span>
+            {creatorTier ? (
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  onChange={handleBgImage}
+                  className="hidden"
+                  id={`bgimg-${segmentId}`}
+                />
+                <label
+                  htmlFor={`bgimg-${segmentId}`}
+                  className="cursor-pointer rounded-full border border-ink/15 px-3 py-1 text-xs font-semibold text-ink/70 hover:bg-ink/5"
+                >
+                  {bgBusy ? "Uploading…" : hasBgImage ? "Replace image" : "Upload image"}
+                </label>
+                {hasBgImage && (
+                  <button
+                    type="button"
+                    onClick={handleClearBgImage}
+                    disabled={bgBusy}
+                    className="text-ink/35 hover:text-ink text-xs"
+                    title="Remove image background"
+                  >
+                    ✕ remove
+                  </button>
+                )}
+                <span className="text-[10px] text-ink/35">PNG/JPEG, ≤1MB</span>
+              </>
+            ) : (
+              <span className="text-[11px] text-ink/40">
+                Upload your own photo — a Creator-plan feature.
+              </span>
+            )}
           </div>
 
           {hasOverrides && (

@@ -39,6 +39,7 @@ export function ClipPreviewPlayer({
   template,
   clipStyle,
   bgColors,
+  bgImageUrl = null,
   format = DEFAULT_FORMAT,
 }: {
   audioUrl: string;
@@ -52,6 +53,8 @@ export function ClipPreviewPlayer({
   /** Per-clip custom background colors (S7.2); override the template when set.
    *  Same resolver the render uses, so preview/export agree. */
   bgColors?: { custom_bg_c0?: string | null; custom_bg_c1?: string | null };
+  /** Signed URL of a custom image background (S7.3); overrides everything. */
+  bgImageUrl?: string | null;
   /** Export aspect ratio, so the preview frame matches the output. */
   format?: ClipFormat;
 }) {
@@ -119,14 +122,22 @@ export function ClipPreviewPlayer({
     <div className="flex items-center gap-3">
       <div
         className={`relative ${FORMAT_BOX[format]} shrink-0 overflow-hidden rounded-xl`}
-        style={{
-          background: cssBackground(
-            (() => {
-              const bg = resolveSegmentBackground(template, bgColors);
-              return parseBackgroundStyle(bg.backgroundStyle, bg.primaryColor);
-            })(),
-          ),
-        }}
+        style={
+          bgImageUrl
+            ? {
+                backgroundImage: `url("${bgImageUrl}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : {
+                background: cssBackground(
+                  (() => {
+                    const bg = resolveSegmentBackground(template, bgColors);
+                    return parseBackgroundStyle(bg.backgroundStyle, bg.primaryColor);
+                  })(),
+                ),
+              }
+        }
       >
         <div
           className={`absolute inset-0 flex justify-center p-2 text-center ${p.align}`}

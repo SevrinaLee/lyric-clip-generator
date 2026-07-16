@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateSegments } from "@/lib/scoring";
-import { evaluateSongAccess, exportTier } from "@/lib/access";
+import { evaluateSongAccess, exportTier, isPaidAccount } from "@/lib/access";
+import { sniffImage } from "@/lib/imageSniff";
 import { renderSegmentToBuffer, exportStoragePath } from "@/lib/exportRender";
 import {
   FONT_REGISTRY,
@@ -592,6 +593,85 @@ export async function duplicateSegment(segmentId: string) {
   return copy.id as string;
 }
 
+// Upload a custom image background for a clip (v1.7 S7.3). Creator-gated:
+// enforced here (isPaidAccount) AND at render time. The image is magic-byte
+// sniffed (PNG/JPEG, ≤1MB) — a renamed .html/SVG is rejected — and stored under
+// the caller's own <uid>/ folder in the private clip-backgrounds bucket, so the
+// bucket RLS also scopes it. The path carries no user input (uid + segmentId
+// only), so there's no traversal surface.
+export async function updateClipBgImage(segmentId: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  if (!(await isPaidAccount(user.id))) {
+    throw new Error("Custom image backgrounds are a Creator-plan feature.");
+  }
+
+  // Ownership: read the segment under the caller's RLS session (B can't see A's).
+  const { data: segment } = await supabase
+    .from("clip_segments")
+    .select("song_id")
+    .eq("id", segmentId)
+    .maybeSingle<{ song_id: string }>();
+  if (!segment) throw new Error("Clip segment not found");
+
+  const file = formData.get("image");
+  if (!file || typeof file !== "object" || !("arrayBuffer" in file) || file.size === 0) {
+    throw new Error("An image file is required");
+  }
+  if (file.size > 1_000_000) throw new Error("Image must be 1MB or smaller");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const kind = sniffImage(bytes);
+  if (!kind) throw new Error("Background must be a PNG or JPEG image");
+
+  // Fixed per-segment path (no extension) → replace-in-place on re-upload, one
+  // active image per clip. uid + segmentId only, so no path traversal.
+  const path = `${user.id}/${segmentId}`;
+  const { error: upErr } = await supabase.storage
+    .from("clip-backgrounds")
+    .upload(path, bytes, {
+      contentType: kind === "png" ? "image/png" : "image/jpeg",
+      upsert: true,
+    });
+  if (upErr) throw new Error(`Could not upload image: ${upErr.message}`);
+
+  const { error } = await supabase
+    .from("clip_segments")
+    .update({ custom_bg_image_path: path })
+    .eq("id", segmentId);
+  if (error) throw new Error(`Could not set background: ${error.message}`);
+  revalidatePath(`/songs/${segment.song_id}`);
+}
+
+// Remove a clip's custom image background (clears the column + deletes the file).
+export async function clearClipBgImage(segmentId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  const { data: segment } = await supabase
+    .from("clip_segments")
+    .select("song_id, custom_bg_image_path")
+    .eq("id", segmentId)
+    .maybeSingle<{ song_id: string; custom_bg_image_path: string | null }>();
+  if (!segment) throw new Error("Clip segment not found");
+
+  if (segment.custom_bg_image_path) {
+    await supabase.storage.from("clip-backgrounds").remove([segment.custom_bg_image_path]);
+  }
+  const { error } = await supabase
+    .from("clip_segments")
+    .update({ custom_bg_image_path: null })
+    .eq("id", segmentId);
+  if (error) throw new Error(`Could not clear background: ${error.message}`);
+  revalidatePath(`/songs/${segment.song_id}`);
+}
+
 export async function queueExport(segmentId: string, format: string = DEFAULT_FORMAT) {
   const supabase = await createClient();
   const {
@@ -678,11 +758,24 @@ export async function submitToShowcase(exportId: string, title: string) {
   // RLS ensures the export is the caller's; also require it to be finished.
   const { data: exp } = await supabase
     .from("exports")
-    .select("id, status")
+    .select("id, status, clip_segment_id")
     .eq("id", exportId)
-    .maybeSingle<{ id: string; status: string }>();
+    .maybeSingle<{ id: string; status: string; clip_segment_id: string }>();
   if (!exp) throw new Error("Export not found");
   if (exp.status !== "done") throw new Error("Finish rendering the clip first");
+
+  // Moderation surface control (S7.3): clips using a user-uploaded image
+  // background are never auto-eligible for the public showcase.
+  const { data: seg } = await supabase
+    .from("clip_segments")
+    .select("custom_bg_image_path")
+    .eq("id", exp.clip_segment_id)
+    .maybeSingle<{ custom_bg_image_path: string | null }>();
+  if (seg?.custom_bg_image_path) {
+    throw new Error(
+      "Clips with a custom image background can’t be featured in the public showcase.",
+    );
+  }
 
   const { data: existing } = await supabase
     .from("showcase_entries")

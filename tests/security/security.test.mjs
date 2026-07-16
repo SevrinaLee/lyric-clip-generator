@@ -955,6 +955,84 @@ describe("14. Per-clip custom colors (0023)", () => {
   });
 });
 
+// ── 15. CUSTOM IMAGE BACKGROUNDS (migration 0024) ──────────────────────────
+// Two surfaces: the clip_segments.custom_bg_image_path column (owner-only, like
+// §6/§14) and the private clip-backgrounds storage bucket (each user can only
+// write/read under their own <uid>/ folder). Premium (Creator) gating lives in
+// the updateClipBgImage action; this proves the isolation the render relies on.
+describe("15. Custom image backgrounds (0024)", () => {
+  let segmentId;
+  const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG magic
+
+  before(async () => {
+    const { data: seg, error } = await ctx.a.client
+      .from("clip_segments")
+      .insert({
+        song_id: ctx.a.songId,
+        user_id: ctx.a.user.id,
+        label: "Hook",
+        start_ms: 0,
+        end_ms: 8000,
+        platform: "tiktok",
+      })
+      .select("id")
+      .single();
+    assert.equal(error, null, "setup: A should insert own clip segment");
+    segmentId = seg.id;
+  });
+
+  it("positive control: A can set own custom_bg_image_path", async () => {
+    const { data, error } = await ctx.a.client
+      .from("clip_segments")
+      .update({ custom_bg_image_path: `${ctx.a.user.id}/${segmentId}` })
+      .eq("id", segmentId)
+      .select("custom_bg_image_path");
+    assert.equal(error, null);
+    assert.equal(data?.[0]?.custom_bg_image_path, `${ctx.a.user.id}/${segmentId}`);
+  });
+
+  it("B cannot modify A's custom_bg_image_path", async () => {
+    const { data } = await ctx.b.client
+      .from("clip_segments")
+      .update({ custom_bg_image_path: `${ctx.b.user.id}/hax` })
+      .eq("id", segmentId)
+      .select();
+    assert.equal(data?.length ?? 0, 0, "update must affect zero rows");
+  });
+
+  it("A can upload to own <uid>/ folder in clip-backgrounds", async () => {
+    const { error } = await ctx.a.client.storage
+      .from("clip-backgrounds")
+      .upload(`${ctx.a.user.id}/${segmentId}`, bytes, {
+        contentType: "image/png",
+        upsert: true,
+      });
+    assert.equal(error, null, "owner upload to own folder should succeed");
+  });
+
+  it("B cannot upload into A's folder", async () => {
+    const { error } = await ctx.b.client.storage
+      .from("clip-backgrounds")
+      .upload(`${ctx.a.user.id}/steal`, bytes, { contentType: "image/png" });
+    assert.ok(error, "cross-user upload must be rejected by bucket RLS");
+  });
+
+  it("anon cannot upload to clip-backgrounds", async () => {
+    const anon = anonClient(env);
+    const { error } = await anon.storage
+      .from("clip-backgrounds")
+      .upload(`${ctx.a.user.id}/anon`, bytes, { contentType: "image/png" });
+    assert.ok(error, "anon upload must be rejected");
+  });
+
+  it("B cannot download A's background object", async () => {
+    const { data, error } = await ctx.b.client.storage
+      .from("clip-backgrounds")
+      .download(`${ctx.a.user.id}/${segmentId}`);
+    assert.ok(error || !data, "cross-user download must not return A's object");
+  });
+});
+
 // ── 3. BRUTE-FORCE DEFENSES ─────────────────────────────────────────────────
 // Runs LAST: it deliberately consumes the IP's sign-in budget.
 describe("3. Brute-force defenses (rapid failed sign-ins are throttled)", () => {

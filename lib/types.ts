@@ -74,6 +74,9 @@ export type ClipSegment = {
   custom_bg_c0?: string | null;
   custom_bg_c1?: string | null;
   custom_caption_color?: string | null;
+  // Custom image background (migration 0024, Creator-gated); storage path in
+  // the private clip-backgrounds bucket, null = none. Overrides colors/template.
+  custom_bg_image_path?: string | null;
   hook_score: number | null;
   hook_score_source: string | null;
   hook_score_confidence: number | null;

@@ -139,6 +139,19 @@ export default async function SongDetailPage({
     }
   }
 
+  // Signed URLs for custom image backgrounds (S7.3) so the preview shows them
+  // (the bucket is private). Only the owner's own segments are read here.
+  const bgImageBySegment = new Map<string, string>();
+  if (isOwner) {
+    for (const seg of segments ?? []) {
+      if (!seg.custom_bg_image_path) continue;
+      const { data: signed } = await supabase.storage
+        .from("clip-backgrounds")
+        .createSignedUrl(seg.custom_bg_image_path, 60 * 60);
+      if (signed?.signedUrl) bgImageBySegment.set(seg.id, signed.signedUrl);
+    }
+  }
+
   // Load template fonts plus every registry font, so the per-clip font picker
   // previews correctly no matter which override the user chooses.
   const fontsUrl =
@@ -256,6 +269,7 @@ export default async function SongDetailPage({
                 templates={templates ?? []}
                 linesBySegment={linesBySegment}
                 exportsBySegment={exportsBySegment}
+                bgImageBySegment={bgImageBySegment}
                 lyricsUpdatedAt={lyricsUpdatedAt}
                 songDurationSeconds={song.duration_seconds}
                 unlocked={access.unlocked}
