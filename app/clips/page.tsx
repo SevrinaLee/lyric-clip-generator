@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { evaluateSongAccess } from "@/lib/access";
+import { isTikTokConfigured } from "@/lib/tiktok";
 import type { ClipSegment, Export, Song } from "@/lib/types";
 import { Icon } from "../nav/icons";
 
@@ -11,7 +12,20 @@ const PLATFORM_STYLES: Record<string, string> = {
   shorts: "bg-sage/30 text-ink",
 };
 
-export default async function MyClipsPage() {
+const TIKTOK_STATUS: Record<string, { text: string; tone: string }> = {
+  posted: { text: "Posted to TikTok (private until your app is approved).", tone: "bg-sage/20 border-sage/40 text-ink" },
+  connected: { text: "TikTok account connected.", tone: "bg-sage/20 border-sage/40 text-ink" },
+  cancelled: { text: "TikTok posting was cancelled.", tone: "bg-ink/5 border-ink/15 text-ink/60" },
+  error: { text: "Something went wrong posting to TikTok. Please try again.", tone: "bg-mauve/15 border-mauve/30 text-ink" },
+};
+
+export default async function MyClipsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tiktok?: string }>;
+}) {
+  const { tiktok } = await searchParams;
+  const tiktokStatus = tiktok ? TIKTOK_STATUS[tiktok] : null;
   const supabase = await createClient();
   const {
     data: { user },
@@ -67,6 +81,9 @@ export default async function MyClipsPage() {
   });
 
   const clips = (exports ?? []).filter((e) => segById.has(e.clip_segment_id));
+  // TikTok posting (S6.2) is dark until credentials are set — the affordance
+  // only appears when the integration is configured.
+  const tiktokEnabled = isTikTokConfigured();
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -86,6 +103,12 @@ export default async function MyClipsPage() {
             New song
           </Link>
         </div>
+
+        {tiktokStatus && (
+          <div className={`rounded-2xl border px-4 py-3 text-sm ${tiktokStatus.tone}`}>
+            {tiktokStatus.text}
+          </div>
+        )}
 
         {clips.length === 0 ? (
           <div className="rounded-3xl bg-cream-deep border border-ink/10 p-10 text-center space-y-4">
@@ -150,7 +173,16 @@ export default async function MyClipsPage() {
                       <Icon name="film" className="h-4 w-4" />
                       Download
                     </a>
-                  ) : (
+                  ) : null}
+                  {unlocked && tiktokEnabled && (
+                    <a
+                      href={`/api/tiktok/start?exportId=${exp.id}`}
+                      className="rounded-full border border-ink/20 text-ink px-4 py-2 text-sm font-semibold hover:bg-ink/5 transition-colors"
+                    >
+                      Post to TikTok
+                    </a>
+                  )}
+                  {!unlocked && (
                     <Link
                       href={`/songs/${seg.song_id}`}
                       className="rounded-full border border-ink/20 text-ink px-4 py-2 text-sm font-semibold hover:bg-ink/5 transition-colors"

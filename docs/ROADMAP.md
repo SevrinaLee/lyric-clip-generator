@@ -526,9 +526,16 @@ keep the gallery fast.
 - **Journey:** `mobile` node **`device` → `live`** (verified on real viewport).
 **Don't:** a separate mobile app; gesture rework.
 
-### Carried-over / deferred (documented, not buildable on current infra)
-- **S6.2 — Direct posting (TikTok)** — long pole; needs external app-review that
-  can't complete in-build. Ships as flag-gated stub only; revisit when approved.
+### Carried-over / deferred
+- **S6.2 — Direct posting (TikTok)** — *app-review process kicked off.* The
+  flag-gated Login-Kit OAuth + Direct-Post integration is built and dark until
+  `TIKTOK_CLIENT_KEY`/`TIKTOK_CLIENT_SECRET` are set (`lib/tiktok.ts`,
+  `/api/tiktok/{start,callback}`; routes 404 while unconfigured). The remaining
+  steps are account/consent actions only the owner can do — register the app,
+  host Privacy/Terms URLs, set the env vars, record a demo, and submit for
+  audit. Full checklist in [docs/tiktok-app-review.md](tiktok-app-review.md).
+  Posts stay `SELF_ONLY` (private) until TikTok's audit passes; after approval,
+  add a privacy-level picker.
 - **S6.3 — Video-loop backgrounds** — needs the background-render headroom that
   the deferred S5.1 pipeline would provide (blocked by no Fluid Compute).
 
