@@ -15,8 +15,10 @@ it's safe in production and ready to demo the moment the app is registered.
 ---
 
 ## 0. Prerequisites you must have ready before submitting
-- A **published, reachable Privacy Policy URL** and **Terms of Service URL** (the
-  app already has room for these — host them on the marketing site).
+- A **published, reachable Privacy Policy URL** and **Terms of Service URL** —
+  these now exist at `https://lyric-clip-generator.vercel.app/privacy` and
+  `/terms`. Before submitting, set the real contact email + jurisdiction in
+  `app/legal/content.ts` (currently placeholders).
 - The **production domain** verified (TikTok requires URL/domain verification for
   `PULL_FROM_URL`; the scaffold uses `FILE_UPLOAD` to avoid that dependency for
   the demo — see §4).

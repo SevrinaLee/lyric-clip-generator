@@ -47,6 +47,16 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
         {children}
+        <footer className="mt-auto border-t border-ink/10 px-4 py-6">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-ink/40">
+            <span>© {new Date().getFullYear()} Lyric Clip Generator</span>
+            <Link href="/pricing" className="hover:text-ink">Pricing</Link>
+            <Link href="/support" className="hover:text-ink">Support</Link>
+            <Link href="/faq" className="hover:text-ink">FAQ</Link>
+            <Link href="/privacy" className="hover:text-ink">Privacy</Link>
+            <Link href="/terms" className="hover:text-ink">Terms</Link>
+          </div>
+        </footer>
       </>
     );
   }
