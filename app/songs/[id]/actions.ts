@@ -16,6 +16,7 @@ import {
 } from "@/lib/captionStyles";
 import { isFormat, isFormatPremium, DEFAULT_FORMAT } from "@/lib/formats";
 import { transcribeAudio } from "@/lib/whisper";
+import { detectOnsets, snapLinesToOnsets } from "@/lib/beats";
 import type { ClipSegment, Lyric, Song, VideoTemplate } from "@/lib/types";
 
 export async function addLyrics(songId: string, rawText: string) {
@@ -168,6 +169,63 @@ export async function bulkUpdateLyricTimings(
     .in("lyric_id", updates.map((u) => u.id));
 
   if (lyric) revalidatePath(`/songs/${lyric.song_id}`);
+}
+
+// Beat-aware auto-timing (v1.8 S8.1). Rule-based, NO API: analyze the song's
+// own audio for onsets and snap each lyric line's start onto the nearest
+// musical hit (starting from the even-split baseline). Falls back with a
+// friendly error when the audio has too few clear onsets, so nothing regresses.
+export async function snapLyricsToBeats(songId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be logged in");
+
+  // RLS scopes both reads to the owner.
+  const { data: song } = await supabase
+    .from("songs")
+    .select("audio_url, duration_seconds")
+    .eq("id", songId)
+    .maybeSingle<{ audio_url: string | null; duration_seconds: number | null }>();
+  if (!song?.audio_url) throw new Error("Song has no audio to analyze");
+  if (!song.duration_seconds || song.duration_seconds <= 0) {
+    throw new Error("Song duration is unknown — can't align to the beat yet");
+  }
+
+  const { data: lyrics } = await supabase
+    .from("lyrics")
+    .select("id, text")
+    .eq("song_id", songId)
+    .order("line_index", { ascending: true })
+    .returns<{ id: string; text: string }[]>();
+  if (!lyrics || lyrics.length === 0) throw new Error("Add lyrics first");
+
+  const onsets = await detectOnsets(song.audio_url);
+  const snapped = snapLinesToOnsets(lyrics.length, song.duration_seconds, onsets);
+  if (!snapped) {
+    throw new Error(
+      "Couldn't find a clear beat in this track — try the Tap timing tool instead.",
+    );
+  }
+
+  const now = new Date().toISOString();
+  for (let i = 0; i < lyrics.length; i++) {
+    const { error } = await supabase
+      .from("lyrics")
+      .update({ start_ms: snapped[i].start_ms, end_ms: snapped[i].end_ms, updated_at: now })
+      .eq("id", lyrics[i].id);
+    if (error) throw new Error(`Could not save timing: ${error.message}`);
+  }
+
+  // Line-level retiming makes any stored per-word times stale — drop them.
+  await supabase
+    .from("lyric_words")
+    .delete()
+    .in("lyric_id", lyrics.map((l) => l.id));
+
+  revalidatePath(`/songs/${songId}`);
+  return { lines: lyrics.length };
 }
 
 // Deleting doesn't renumber remaining rows' line_index — the UI displays

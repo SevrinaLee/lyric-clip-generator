@@ -15,7 +15,8 @@
     "verify:donation": "tsx scripts/verify-donation.ts",
     "verify:colors": "tsx scripts/verify-custom-colors.ts",
     "verify:gif": "tsx scripts/verify-gif.ts",
-    "verify:imagebg": "tsx scripts/verify-image-bg.ts"
+    "verify:imagebg": "tsx scripts/verify-image-bg.ts",
+    "verify:beats": "tsx scripts/verify-beats.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",

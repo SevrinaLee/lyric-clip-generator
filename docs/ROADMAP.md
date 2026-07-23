@@ -546,6 +546,73 @@ brand to every clip", batch/zip export, CJK/Latin-extended caption font.
 
 ---
 
+## v1.8 — Signal, polish & efficiency (no new APIs)
+
+Squeeze more quality and lower cost out of the free-tier stack. Same
+constraints: synchronous ffmpeg render, free Supabase, **no external/paid APIs**
+(rule-based + ffmpeg signal analysis only). Migrations continue from **0025**.
+
+### Sprint 8.1 — Beat/onset-aware auto-timing (flagship)
+**Goal:** fix the product's real weak spot — without a transcription key, pasted
+lyrics currently get an *even* time split. The audio itself is free signal.
+- `lib/beats.ts`: decode the song to mono PCM via ffmpeg
+  (`-ac 1 -ar 22050 -f s16le`), compute a short-time energy envelope, and detect
+  onsets by adaptive peak-picking with a minimum inter-onset gap.
+- `snapLyricsToBeats(songId)` server action: start from the even-split baseline,
+  then **snap each line's start to the nearest onset** within a window; enforce
+  monotonic + min-gap; persist via the existing bulk timing write.
+- UI: a "🎵 Snap to beat" action beside Tap timing.
+- **Honest fallback:** too few onsets detected → keep the even split (nothing
+  regresses). No schema. `verify:beats` proves detection on a synthetic click.
+**Don't:** full DSP beat-tracking / tempo estimation; per-word onset alignment.
+
+### Sprint 8.2 — Poster frames + bandwidth savings
+**Goal:** stop loading full videos in grids (a real free-tier bandwidth cost)
+and get social share images for free.
+- On render, also extract one poster still (`ffmpeg -frames:v 1`) to the exports
+  bucket; `migration 0025` adds `exports.poster_path`.
+- Library + showcase show the poster (lazy-load the `<video>` on interaction);
+  poster becomes the per-showcase-clip OG image.
+- Same bucket/RLS as the MP4. Security section extended for the new column.
+**Don't:** animated preview GIFs in the grid (defeats the bandwidth goal).
+
+### Sprint 8.3 — SRT/VTT subtitle export
+**Goal:** power-user delight, near-zero cost.
+- `/api/exports/[id]/subtitles?format=srt|vtt` builds a caption file from the
+  clip's line timing (pure string transform); a download link on each clip.
+- No schema.
+**Don't:** styled/positioned subtitle formats (ASS export) — out of scope.
+
+### Sprint 8.4 — Auto palette + contrast guard
+**Goal:** make the custom-colour/image features smarter.
+- Reuse `palettegen` on an uploaded image/cover to **suggest** a gradient +
+  caption colour ("Suggest colours" in the style panel).
+- Compute WCAG contrast between caption and background; warn on low-contrast
+  combos before export. Pure math. No schema.
+**Don't:** auto-apply colours without the user's confirmation.
+
+### Sprint 8.5 — Render caching + storage hygiene
+**Goal:** protect the scarcest resources (the 60s sync budget + free storage).
+- Hash the render inputs (window + resolved style + colours + image + tier);
+  store on `exports` (`render_hash`, `migration 0025`). Skip re-render when the
+  hash is unchanged; serve the cached file.
+- On replace/clear, delete orphaned storage objects; cap stored files per user.
+**Don't:** a distributed cache or CDN layer — DB-hash + storage only.
+
+### Sprint 8.6 — Caption effects + editing UX
+**Goal:** more range and a nicer editor, all libass/DB.
+- New ASS animations (real typewriter, slide-in, highlight-bar) + text effects
+  (uppercase, letter-spacing, gradient text fill).
+- Clip-window **drag handles** (replace ± nudge); **bulk "apply style to all
+  clips"** in a song.
+**Don't:** a full timeline/NLE; free-drag caption positioning.
+
+### Parked for v1.9 (growth & monetization, still API-free)
+Public creator profile pages, showcase likes + "trending" sort, referral →
+earn-a-free-song, pay-what-you-want / multi-song bundles / gift a subscription.
+
+---
+
 ## Sequencing rationale & dependency graph
 
 ```

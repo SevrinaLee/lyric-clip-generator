@@ -5,6 +5,7 @@ import type { Lyric } from "@/lib/types";
 import { EditableLyricsTable, type EditableLine } from "./EditableLyricsTable";
 import { TapTimingTool } from "./TapTimingTool";
 import { AutoTranscribeButton } from "./AutoTranscribeButton";
+import { SnapToBeatButton } from "./SnapToBeatButton";
 
 export function LyricsEditPanel({
   lyrics,
@@ -51,6 +52,7 @@ export function LyricsEditPanel({
                 ⏱ Tap the timing
               </button>
             )}
+            {audioUrl && <SnapToBeatButton songId={songId} />}
             {transcribeEnabled && audioUrl && (
               <AutoTranscribeButton songId={songId} />
             )}
